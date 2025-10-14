@@ -1,9 +1,9 @@
 <?php
 namespace App\Http\Controllers;
 
-use App\Models\BridgingSep;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class AntrolBpjsController extends Controller
@@ -119,16 +119,28 @@ class AntrolBpjsController extends Controller
     {
         ini_set('max_execution_time', 300);
         $dataSep = json_decode($request->input('data_sep_belum_selesai'), true);
-        // dd($dataSep);
-        $result = [];
+        $result  = [];
 
         foreach ($dataSep as $data) {
-            $str_kd_booking = $data['kodebooking'];
-            $array          = explode(',', $str_kd_booking);
-            // hapus spasi di tiap elemen
+            $str_kd_booking   = $data['kodebooking'];
+            $array            = explode(',', $str_kd_booking);
             $array_kd_booking = array_map('trim', $array);
-            $bSep             = BridgingSep::with(['reg_periksa', 'mutasi_berkas', 'pemeriksaan_ralan'])
-                ->find($data['noSep']);
+
+            // Ambil data bridging_sep + pemeriksaan_ralan + mutasi_berkas pakai JOIN native
+            $bSep = DB::table('bridging_sep as bs')
+                ->leftJoin('mutasi_berkas as mb', 'bs.no_rawat', '=', 'mb.no_rawat')
+                ->leftJoin('pemeriksaan_ralan as pr', 'bs.no_rawat', '=', 'pr.no_rawat')
+                ->leftJoin('reg_periksa as rp', 'bs.no_rawat', '=', 'rp.no_rawat')
+                ->select(
+                    'bs.no_sep',
+                    'bs.no_rawat',
+                    'bs.tglsep',
+                    'mb.dikirim',
+                    'mb.diterima',
+                    'pr.jam_rawat'
+                )
+                ->where('bs.no_sep', $data['noSep'])
+                ->first();
 
             if (! $bSep) {
                 $result[] = [
@@ -138,13 +150,18 @@ class AntrolBpjsController extends Controller
                 ];
                 continue;
             }
-            foreach ($array_kd_booking as $kd_booking) {
-                $t_rawat = $data['tglSep'] . " " . ($bSep->pemeriksaan_ralan->jam_rawat ?? '00:00:00');
 
-                $updates = [];
-                foreach ([3 => $bSep->mutasi_berkas->dikirim ?? null,
-                    4           => $bSep->mutasi_berkas->diterima ?? null,
-                    5           => $t_rawat] as $taskid => $waktu) {
+            foreach ($array_kd_booking as $kd_booking) {
+                $t_rawat = $data['tglSep'] . ' ' . ($bSep->jam_rawat ?? '00:00:00');
+
+                $updates  = [];
+                $waktuMap = [
+                    3 => $bSep->dikirim ?? null,
+                    4 => $bSep->diterima ?? null,
+                    5 => $t_rawat,
+                ];
+
+                foreach ($waktuMap as $taskid => $waktu) {
                     if ($waktu) {
                         try {
                             $response         = updateWaktuAntrean($kd_booking, $taskid, $waktu);
@@ -172,13 +189,13 @@ class AntrolBpjsController extends Controller
                     'updates'     => $updates,
                 ];
             }
-
         }
-        // Simpan ke file JSON di storage/app/public/sep_update.json
+
+// Simpan ke file JSON di storage/app/public/sep_update.json
         $fileName = 'taksId_update_' . now()->format('Ymd_His') . '.json';
         Storage::disk('public')->put($fileName, json_encode($result, JSON_PRETTY_PRINT));
 
-        // Simpan ke session
         return redirect()->back()->with('status_update_waktu', $result);
+
     }
 }

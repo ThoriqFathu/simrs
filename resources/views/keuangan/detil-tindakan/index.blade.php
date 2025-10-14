@@ -5,7 +5,7 @@
         <h3 class="text-xl font-bold mb-6">Rekap Detil Tindakan</h3>
 
         {{-- Filter Tanggal --}}
-        <form class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" method="get">
+        <form class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6" method="get">
             <div>
                 <label class="block mb-1 text-sm font-medium">Tanggal Awal</label>
                 <input type="date" name="tanggal_awal" class="w-full border rounded p-2" value="{{ $tanggalAwal }}">
@@ -13,6 +13,29 @@
             <div>
                 <label class="block mb-1 text-sm font-medium">Tanggal Akhir</label>
                 <input type="date" name="tanggal_akhir" class="w-full border rounded p-2" value="{{ $tanggalAkhir }}">
+            </div>
+            <div>
+                <label class="block mb-1 text-sm font-medium">Jenis Pelayanan</label>
+                <select name="jns" class="w-full border rounded p-2">
+                    <option value="1" {{ $jnsPelayanan == 1 ? 'selected' : '' }}>Rawat Inap</option>
+                    <option value="2" {{ $jnsPelayanan == 2 ? 'selected' : '' }}>Rawat Jalan</option>
+                    <option value="3" {{ $jnsPelayanan == 3 ? 'selected' : '' }}>IGD</option>
+                </select>
+            </div>
+            <div>
+                <label class="block mb-1 text-sm font-medium">Jaminan</label>
+                <select name="jaminan" class="w-full border rounded p-2">
+                    <option value="umum" {{ $jaminan == 1 ? 'selected' : '' }}>Umum</option>
+                    <option value="bpjs" {{ $jaminan == 2 ? 'selected' : '' }}>BPJS</option>
+                    <option value="lainnya" {{ $jaminan == 3 ? 'selected' : '' }}>Lainnya</option>
+                </select>
+            </div>
+            <div>
+                <label class="block mb-1 text-sm font-medium">Status Bayar</label>
+                <select name="status_bayar" class="w-full border rounded p-2">
+                    <option value="Sudah Bayar" {{ $status_bayar == 'Sudah Bayar' ? 'selected' : '' }}>Sudah Bayar</option>
+                    <option value="Belum Bayar" {{ $status_bayar == 'Belum Bayar' ? 'selected' : '' }}>Belum Bayar</option>
+                </select>
             </div>
 
             <div class="col-span-1 md:col-span-4">

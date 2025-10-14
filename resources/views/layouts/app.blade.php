@@ -46,7 +46,7 @@
 
         <nav class="px-6">
             <ul class="my-2">
-                <li class="hover:bg-indigo-700 py-3 px-4 rounded hover:text-white flex items-center gap-2">
+                {{-- <li class="hover:bg-indigo-700 py-3 px-4 rounded hover:text-white flex items-center gap-2">
                     <img width="20" height="20"
                         src="https://img.icons8.com/material-rounded/100/dashboard-layout.png" alt="dashboard" />
                     <a href="#" class="font-semibold">Dashboard</a>
@@ -60,7 +60,7 @@
                     <img width="20" height="20"
                         src="https://img.icons8.com/material-rounded/100/dashboard-layout.png" alt="dashboard" />
                     <a href="{{ route('monitoring.referensi_mjkn.index') }}" class="font-semibold">Referensi MJKN</a>
-                </li>
+                </li> --}}
                 <li class="hover:bg-indigo-700 py-3 px-4 rounded hover:text-white flex items-center gap-2">
                     <img width="20" height="20"
                         src="https://img.icons8.com/material-rounded/100/dashboard-layout.png" alt="dashboard" />

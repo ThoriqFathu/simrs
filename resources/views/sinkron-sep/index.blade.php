@@ -24,6 +24,14 @@
 
         {{-- Tabel Data --}}
         @if (!empty($flattened))
+            <form action="{{ route('monitoring.klaim.export') }}" method="POST" class="flex">
+                @csrf
+                <input type="hidden" name="data" value="{{ json_encode($flattened) }}">
+                <button type="submit"
+                    class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 w-full sm:w-auto">
+                    Export Excel
+                </button>
+            </form>
             <div class="overflow-x-auto border rounded-lg shadow">
                 <table class="min-w-full text-sm border-collapse">
                     <thead>
@@ -40,11 +48,8 @@
                             <tr class="{{ $row['sinkron'] == 0 ? 'bg-red-100' : 'bg-green-100' }} hover:bg-gray-50">
                                 @foreach ($allKeys as $key)
                                     <td class="border px-2 py-1">
-                                        @if ($key === 'jnspelayanan')
-                                            {{ $row[$key] == 2 ? 'Ralan' : ($row[$key] == 1 ? 'Ranap' : '-') }}
-                                        @else
-                                            {{ $row[$key] ?? ($key != 'nama' ? '0' : '') }}
-                                        @endif
+
+                                        {{ $row[$key] ?? '' }}
                                     </td>
                                 @endforeach
                             </tr>
@@ -52,11 +57,6 @@
 
                     </tbody>
                 </table>
-            </div>
-
-            {{-- Pagination --}}
-            <div class="mt-4">
-                {{ $data->appends(request()->query())->links() }}
             </div>
         @else
             <div class="p-4 bg-yellow-100 text-yellow-800 rounded">

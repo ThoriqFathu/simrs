@@ -13,8 +13,11 @@ class DetilTindakanController extends Controller
         // ambil parameter form
         $tanggalAwal  = $request->get('tanggal_awal', "2025-08-01");
         $tanggalAkhir = $request->get('tanggal_akhir', "2025-08-01");
+        $jnsPelayanan = $request->get('jns', 1);
+        $jaminan      = $request->get('jaminan', 'bpjs');
+        $status_bayar = $request->get('status_bayar', "Sudah Bayar");
 
-        $data = DB::select("
+        $sql = "
             SELECT
                 pasien.nm_pasien,
                 reg_periksa.no_rawat,
@@ -40,13 +43,39 @@ class DetilTindakanController extends Controller
                 ON reg_periksa.kd_poli = poliklinik.kd_poli
             INNER JOIN pasien
                 ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
-            WHERE reg_periksa.status_bayar = 'Sudah Bayar'
+            WHERE reg_periksa.status_bayar = ?
             AND reg_periksa.tgl_registrasi BETWEEN ? AND ?
-        ", [$tanggalAwal, $tanggalAkhir]);
+        ";
+
+        $params = [$status_bayar, $tanggalAwal, $tanggalAkhir];
+
+        // Filter jaminan
+        if ($jaminan === 'umum') {
+            $sql .= " AND reg_periksa.kd_pj = ?";
+            $params[] = 'A09';
+        } elseif ($jaminan === 'bpjs') {
+            $sql .= " AND reg_periksa.kd_pj = ?";
+            $params[] = 'BPJ';
+        } else {
+            $sql .= " AND reg_periksa.kd_pj = ? AND reg_periksa.kd_pj != ?";
+            $params[] = 'A09';
+            $params[] = 'BPJ';
+        }
+
+        // Filter jenis pelayanan
+        if ($jnsPelayanan == 1) {
+            $sql .= " AND reg_periksa.status_lanjut = 'Ranap'";
+        } elseif ($jnsPelayanan == 2) {
+            $sql .= " AND reg_periksa.status_lanjut = 'Ralan' AND reg_periksa.kd_poli != 'IGDK'";
+        } elseif ($jnsPelayanan == 3) {
+            $sql .= " AND reg_periksa.status_lanjut = 'Ralan' AND reg_periksa.kd_poli = 'IGDK'";
+        }
+
+        $data = DB::select($sql, $params);
 
         $get_detil = get_data_detil_tindakan($data);
         // dd($get_detil);
-
+        // $get_detil = [];
         $allKeys = [];
         foreach ($get_detil as $row) {
             $rowArray = (array) $row;
@@ -59,6 +88,9 @@ class DetilTindakanController extends Controller
             'allKeys'      => $allKeys,
             'tanggalAwal'  => $tanggalAwal,
             'tanggalAkhir' => $tanggalAkhir,
+            'jaminan'      => $jaminan,
+            'status_bayar' => $status_bayar,
+            'jnsPelayanan' => $jnsPelayanan,
         ]);
     }
 }

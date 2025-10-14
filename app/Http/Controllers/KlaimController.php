@@ -126,7 +126,7 @@ class KlaimController extends Controller
         $flattened = $result['data'];
         // $flattened = formatFlattened($result['data'], 'comma', $excludeKeys);
         // Hapus dd() agar kode ini jalan
-        return Excel::download(new KlaimExport($flattened, $allKeys), 'klaim.xlsx');
+        return Excel::download(new KlaimExport($flattened, $allKeys), 'data.xlsx');
     }
 
 }
