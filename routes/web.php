@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
 
-Route::get('/', [KlaimController::class, 'index'])->name('index');
+// Route::get('/', [KlaimController::class, 'index'])->name('index');
 Route::prefix('monitoring')->name('monitoring.')->middleware('auth.session')->group(function () {
 
     Route::prefix('sinkron-sep')->name('sinkron_sep.')->group(function () {
