@@ -813,13 +813,18 @@ if (! function_exists('get_tarif_kamar')) {
 if (! function_exists('get_data_detil_tindakan')) {
     function get_data_detil_tindakan($data_reg)
     {
+        // if ($jns == 'umum') {
+        //     $noRawats = collect($data_reg)->pluck('no_rawat')->toArray();
+        // }
         $noRawats = collect($data_reg)->pluck('no_rawat')->toArray();
         if (empty($noRawats)) {
             return [];
         }
-
+        // dd($data_reg);
+        // dd($noRawats);
 // Ambil semua data tindakan dalam 1 batch
-        $data_rawat     = get_detil_tindakan_rawat_batch($noRawats);
+        $data_rawat = get_detil_tindakan_rawat_batch($noRawats);
+        // dd($data_rawat);
         $data_operasi   = get_operasi_detil_batch($noRawats);
         $data_radiologi = get_radiologi_detil_batch($noRawats);
         $data_lab       = get_lab_detil_batch($noRawats);

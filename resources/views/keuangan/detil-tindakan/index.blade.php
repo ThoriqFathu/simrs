@@ -5,7 +5,8 @@
         <h3 class="text-xl font-bold mb-6">Rekap Detil Tindakan</h3>
 
         {{-- Filter Tanggal --}}
-        <form class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6" method="get">
+        <form id="form-data" class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6" method="get">
+            {{-- <form class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6" method="get"> --}}
             <div>
                 <label class="block mb-1 text-sm font-medium">Tanggal Awal</label>
                 <input type="date" name="tanggal_awal" class="w-full border rounded p-2" value="{{ $tanggalAwal }}">
@@ -25,9 +26,9 @@
             <div>
                 <label class="block mb-1 text-sm font-medium">Jaminan</label>
                 <select name="jaminan" class="w-full border rounded p-2">
-                    <option value="umum" {{ $jaminan == 1 ? 'selected' : '' }}>Umum</option>
-                    <option value="bpjs" {{ $jaminan == 2 ? 'selected' : '' }}>BPJS</option>
-                    <option value="lainnya" {{ $jaminan == 3 ? 'selected' : '' }}>Lainnya</option>
+                    <option value="umum" {{ $jaminan == 'umum' ? 'selected' : '' }}>Umum</option>
+                    <option value="bpjs" {{ $jaminan == 'bpjs' ? 'selected' : '' }}>BPJS</option>
+                    <option value="lainnya" {{ $jaminan == 'lainnya' ? 'selected' : '' }}>Lainnya</option>
                 </select>
             </div>
             <div>
@@ -45,51 +46,75 @@
             </div>
         </form>
 
-        {{-- Tabel Data --}}
-        @if (!empty($flattened))
-            <form action="{{ route('monitoring.klaim.export') }}" method="POST" class="flex">
-                @csrf
-                <input type="hidden" name="data" value="{{ json_encode($flattened) }}">
-                <button type="submit"
-                    class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 w-full sm:w-auto">
-                    Export Excel
-                </button>
-            </form>
-            <div class="overflow-x-auto border rounded-lg shadow">
-                <table class="min-w-full text-sm border-collapse">
-                    <thead>
-                        <tr class="bg-gray-200">
-                            <th class="border px-2 py-2 text-left font-semibold uppercase text-gray-700 w-12">
-                                No
-                            </th>
-                            @foreach ($allKeys as $key)
-                                <th class="border px-2 py-2 text-left font-semibold uppercase text-gray-700">
-                                    {{ str_replace('_', ' ', str_replace('.', ' ', $key)) }}
-                                </th>
-                            @endforeach
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($flattened as $index => $row)
-                            <tr class="hover:bg-gray-50">
-                                <td class="border px-2 py-1 text-center">
-                                    {{ $index + 1 }}
-                                </td>
-                                @foreach ($allKeys as $key)
-                                    <td class="border px-2 py-1">
-                                        {{ $row[$key] ?? '' }}
-                                    </td>
-                                @endforeach
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+        {{-- Info Loading / Total Data --}}
+        <div id="loading" class="p-3 text-gray-600">Silakan filter dan klik "Tampilkan"…</div>
 
-            </div>
-        @else
-            <div class="p-4 bg-yellow-100 text-yellow-800 rounded">
-                Tidak ada data.
-            </div>
-        @endif
+        {{-- Tombol Export --}}
+        <div id="export-container" class="hidden my-4">
+            <button type="button" onclick="exportExcel()"
+                class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">
+                Export Excel
+            </button>
+        </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+        let offset = 0;
+        const limit = 1000;
+        let allData = [];
+
+        async function fetchBatch(offset) {
+            const params = new URLSearchParams({
+                offset,
+                limit,
+                tanggal_awal: document.querySelector('[name="tanggal_awal"]').value,
+                tanggal_akhir: document.querySelector('[name="tanggal_akhir"]').value,
+                jns: document.querySelector('[name="jns"]').value,
+                jaminan: document.querySelector('[name="jaminan"]').value,
+                status_bayar: document.querySelector('[name="status_bayar"]').value,
+            });
+
+            const res = await fetch(`{{ route('detil-tindakan.data') }}?${params}`);
+            if (!res.ok) throw new Error('Gagal mengambil data');
+            return res.json();
+        }
+
+        async function loadData() {
+            document.getElementById('loading').innerText = '⏳ Sedang memuat data...';
+            let done = false;
+
+            while (!done) {
+                const result = await fetchBatch(offset);
+                allData = allData.concat(result.data);
+                offset = result.offset;
+                done = result.done;
+            }
+
+            document.getElementById('loading').innerText =
+                `✅ Data berhasil dimuat: ${allData.length.toLocaleString()} baris`;
+            document.getElementById('export-container').classList.remove('hidden');
+        }
+
+        document.querySelector('#form-data').addEventListener('submit', function(e) {
+            e.preventDefault();
+            offset = 0;
+            allData = [];
+            document.getElementById('export-container').classList.add('hidden');
+            loadData();
+        });
+
+        function exportExcel() {
+            if (allData.length === 0) {
+                alert('Belum ada data untuk diexport');
+                return;
+            }
+
+            const ws = XLSX.utils.json_to_sheet(allData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Data");
+
+            const fileName = `rekap_tindakan_${new Date().toISOString().split('T')[0]}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+        }
+    </script>
 @endsection
