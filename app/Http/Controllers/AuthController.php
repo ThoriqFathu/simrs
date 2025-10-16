@@ -21,7 +21,7 @@ class AuthController extends Controller
         // dd($username, $password);
         if ($username === $validUser && $password === $validPass) {
             session(['is_logged_in' => true]);
-            return redirect()->route('monitoring.mutasi_berkas.index');
+            return redirect()->route('monitoring.klaim.index');
         }
 
         return back()->withErrors(['login' => 'Username atau password salah.']);
