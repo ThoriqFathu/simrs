@@ -198,4 +198,50 @@ class AntrolBpjsController extends Controller
         return redirect()->back()->with('status_update_waktu', $result);
 
     }
+
+    public function form_manual_send_taksid(Request $request)
+    {
+        $kd_booking = $request->input('kd_booking');
+        // dd($kd_booking);
+        return view('monitoring.antrol.manual-send-taks-id', compact('kd_booking'));
+    }
+    public function manual_send_taskid(Request $request)
+    {
+        $str_kd_booking   = $request->kd_booking;
+        $array            = explode(',', $str_kd_booking);
+        $array_kd_booking = array_map('trim', $array);
+        $updates          = [];
+
+        $waktuMap = [
+            3 => $request->taksid_3 ?? null,
+            4 => $request->taksid_4 ?? null,
+            5 => $request->taksid_5 ?? null,
+        ];
+
+        foreach ($array_kd_booking as $kd_booking) {
+            foreach ($waktuMap as $taskid => $waktu) {
+                if ($waktu) {
+                    try {
+                        $response         = updateWaktuAntrean($kd_booking, $taskid, $waktu);
+                        $updates[$taskid] = [
+                            'success'  => isset($response['response']['metadata']['code']) && $response['response']['metadata']['code'] == 200,
+                            'response' => $response,
+                        ];
+                    } catch (\Exception $e) {
+                        $updates[$taskid] = [
+                            'success'  => false,
+                            'response' => $e->getMessage(),
+                        ];
+                    }
+                } else {
+                    $updates[$taskid] = [
+                        'success'  => false,
+                        'response' => 'Waktu not available',
+                    ];
+                }
+            }
+        }
+
+        return back()->with('updates', $updates);
+    }
 }

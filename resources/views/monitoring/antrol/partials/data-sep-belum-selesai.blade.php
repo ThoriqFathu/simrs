@@ -5,7 +5,7 @@
     <input type="hidden" name="data_sep_belum_selesai" value="{{ json_encode($data_sep_belum_selesai) }}">
     @if (!empty($data_sep_belum_selesai))
         <button type="submit" id="btn-taksid" class="bg-blue-600 text-white px-3 py-1 rounded mb-2">
-            Kirim Taks Id
+            Kirim Semua Taks Id
         </button>
         <script>
             document.getElementById('form-taksid').addEventListener('submit', function(e) {
@@ -38,6 +38,7 @@
                         <th class="border px-3 py-2">{{ ucfirst($key) }}</th>
                     @endforeach
                 @endif
+                <th>Aksi</th>
             </tr>
         </thead>
         <tbody>
@@ -49,6 +50,17 @@
                             {{ is_bool($value) ? ($value ? 'true' : 'false') : $value }}
                         </td>
                     @endforeach
+                    <td>
+                        <form method="get" id="form-taksid"
+                            action="{{ route('monitoring.antrol.form_manual_send_taksid') }}" target="_blank">
+
+                            <input type="hidden" name="kd_booking" value="{{ json_encode($item['kodebooking']) }}">
+                            <button type="submit" id="btn-taksid"
+                                class="bg-blue-600 text-white px-3 py-1 rounded mb-2">
+                                Kirim Taks Id
+                            </button>
+                        </form>
+                    </td>
                 </tr>
             @empty
                 <tr>
