@@ -39,9 +39,8 @@ class KlaimController extends Controller
         $httpcode = 200;
 
         foreach ($periode as $dt) {
-            $tgl = $dt->format('Y-m-d');
-            $url = "$this->baseUrl/Monitoring/Klaim/Tanggal/$tgl/JnsPelayanan/$jnsPelayanan/Status/$statusKlaim";
-
+            $tgl      = $dt->format('Y-m-d');
+            $url      = "$this->baseUrl/Monitoring/Klaim/Tanggal/$tgl/JnsPelayanan/$jnsPelayanan/Status/$statusKlaim";
             $result   = get_ws_bpjs($url);
             $response = $result['response'];
             $key      = $result['key'];
@@ -77,6 +76,7 @@ class KlaimController extends Controller
         $allKeys     = $result['allKeys'];
         $flattened   = $result['data'];
         $excludeKeys = [
+            'no_mr_rs',
             'peserta.noMR',
             'peserta.noKartu',
             'noFPK',

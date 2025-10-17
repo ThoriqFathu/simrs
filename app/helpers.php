@@ -311,18 +311,21 @@ if (! function_exists('get_data_khanza')) {
                 if (count($_data) == 0) {
                     $no_rawat = null;
                 } else {
-                    $no_rawat  = $_data[0]->no_rawat;
-                    $nm_pasien = $_data[0]->nm_pasien;
+                    $no_rawat     = $_data[0]->no_rawat;
+                    $nm_pasien    = $_data[0]->nm_pasien;
+                    $no_rkm_medis = $_data[0]->no_rkm_medis;
                 }
             } else {
-                $no_rawat  = $bSep->no_rawat;
-                $nm_pasien = $bSep->nama_pasien;
+                $no_rawat     = $bSep->no_rawat;
+                $nm_pasien    = $bSep->nama_pasien;
+                $no_rkm_medis = $bSep->nomr;
             }
             if ($no_rawat == null) {
                 $data[] = [
                     "data_bpjs"   => $data_bpjs,
                     "no_rawat"    => null,
                     "nama_pasien" => null,
+                    "no_mr_rs"    => null,
                 ];
             } else {
                 $select_poli = DB::selectOne("
@@ -392,6 +395,7 @@ if (! function_exists('get_data_khanza')) {
                     "kode_dpjp"       => $kd_dpjp,
                     "nama_dpjp"       => $nm_dpjp,
                     "no_rawat"        => $no_rawat,
+                    "no_mr_rs"        => $no_rkm_medis,
                     "nama_pasien"     => $nm_pasien,
                     ""                => $final,
                     "operasi"         => $operasi,
