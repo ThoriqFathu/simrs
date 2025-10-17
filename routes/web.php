@@ -7,6 +7,7 @@ use App\Http\Controllers\DetilTindakanController;
 use App\Http\Controllers\KlaimController;
 use App\Http\Controllers\ReferensiMjknController;
 use App\Http\Controllers\SinkronSepController;
+use App\Http\Controllers\SirsController;
 use Illuminate\Support\Facades\Route;
 
 // Route::get('/', function () {
@@ -55,6 +56,13 @@ Route::prefix('jaspel')->name('jaspel.')->middleware('auth.session')->group(func
     });
 
 });
+Route::prefix('sirs')->name('sirs.')->middleware('auth.session')->group(function () {
+
+    Route::prefix('kamar')->name('kamar.')->group(function () {
+        Route::get('/', [SirsController::class, 'index'])->name('index');
+    });
+
+});
 Route::get('/detil-tindakan/data', [DetilTindakanController::class, 'loadData'])
     ->name('detil-tindakan.data');
 
@@ -65,3 +73,4 @@ Route::post('/logout', function () {
 
 // Route::get('/',[AutoBillingController::class, 'index'])->name('autobilling.index');
 // Route::post('/',[AutoBillingController::class, 'store_all'])->name('nota_jalan.store_all');
+
