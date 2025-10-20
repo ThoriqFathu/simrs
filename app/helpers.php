@@ -1,11 +1,26 @@
 <?php
 
-use App\Models\BridgingSep;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use LZCompressor\LZString;
 
 if (! function_exists('get_name_rs')) {
+    function cache_get($key)
+    {
+        $path = "cache/sepKlaim/{$key}.json";
+        if (Storage::exists($path)) {
+            $json = Storage::get($path);
+            return json_decode($json, true);
+        }
+        return null;
+    }
+
+    function cache_put($key, $data)
+    {
+        $path = "cache/sepKlaim/{$key}.json";
+        Storage::put($path, json_encode($data, JSON_PRETTY_PRINT));
+    }
     function get_name_rs()
     {
         return env('BPJS_CONS_ID') == 16303 ? 'RSUD Ketapang' : "RSIA HIKMAH SAWI";
@@ -302,10 +317,36 @@ if (! function_exists('get_data_khanza')) {
         $sql = "
        SELECT * FROM `pasien` INNER JOIN reg_periksa ON pasien.no_rkm_medis = reg_periksa.no_rkm_medis WHERE pasien.no_peserta = ? AND reg_periksa.tgl_registrasi = ?
         ";
+        $sql_bsep = "
+            SELECT
+                pasien.nm_pasien,
+                reg_periksa.no_rawat,
+                reg_periksa.no_rkm_medis,
+                penjab.png_jawab AS jaminan,
+                poliklinik.nm_poli AS layanan_asal
+            FROM reg_periksa
+            INNER JOIN bridging_sep
+                ON reg_periksa.no_rawat = bridging_sep.no_rawat
+            INNER JOIN penjab
+                ON reg_periksa.kd_pj = penjab.kd_pj
+            INNER JOIN poliklinik
+                ON reg_periksa.kd_poli = poliklinik.kd_poli
+            INNER JOIN pasien
+                ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
+            WHERE bridging_sep.no_sep = ?
+                ";
         $data = [];
         foreach ($flattened as $data_bpjs) {
+            $sep_no = $data_bpjs['noSEP'];
 
-            $bSep = BridgingSep::find($data_bpjs['noSEP']);
+            // cek dulu di cache
+            $cached = cache_get($sep_no);
+            if ($cached) {
+                $data[] = $cached; // langsung ambil dari cache
+                continue;          // lewati pemrosesan selanjutnya
+            }
+
+            $bSep = DB::select($sql_bsep, [$data_bpjs['noSEP']]);
             if ($bSep == null) {
                 $_data = DB::select($sql, [$data_bpjs['peserta.noKartu'], $data_bpjs['tglSep']]);
                 if (count($_data) == 0) {
@@ -316,9 +357,9 @@ if (! function_exists('get_data_khanza')) {
                     $no_rkm_medis = $_data[0]->no_rkm_medis;
                 }
             } else {
-                $no_rawat     = $bSep->no_rawat;
-                $nm_pasien    = $bSep->nama_pasien;
-                $no_rkm_medis = $bSep->nomr;
+                $no_rawat     = $bSep[0]->no_rawat;
+                $nm_pasien    = $bSep[0]->nm_pasien;
+                $no_rkm_medis = $bSep[0]->no_rkm_medis;
             }
             if ($no_rawat == null) {
                 $data[] = [
@@ -391,7 +432,7 @@ if (! function_exists('get_data_khanza')) {
                 $final           = array_replace($final, $data_unit);
 
                 // dd($data_bpjs);
-                $data[] = [
+                $item = [
                     "kode_dpjp"       => $kd_dpjp,
                     "nama_dpjp"       => $nm_dpjp,
                     "no_rawat"        => $no_rawat,
@@ -406,6 +447,8 @@ if (! function_exists('get_data_khanza')) {
                     "keuntungan_obat" => $resutls_farmasi['keuntungan_obat'],
                     "jaspel_farmasi"  => $resutls_farmasi['jaspel_farmasi'],
                 ];
+                cache_put($sep_no, $item);
+                $data[] = $item;
 
             }
         }

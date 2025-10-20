@@ -57,7 +57,7 @@ class KlaimController extends Controller
                 }
             }
         }
-
+        // dd($allKlaim);
         // flatten array untuk tabel
         $klaims    = $allKlaim;
         $allKeys   = [];
