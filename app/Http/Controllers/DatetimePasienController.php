@@ -30,7 +30,6 @@ class DatetimePasienController extends Controller
             LEFT JOIN mutasi_berkas ON mutasi_berkas.no_rawat = reg_periksa.no_rawat
             LEFT JOIN pemeriksaan_ralan ON pemeriksaan_ralan.no_rawat = reg_periksa.no_rawat
             WHERE reg_periksa.tgl_registrasi = ?
-            AND reg_periksa.status_lanjut = 'Ralan'
             AND reg_periksa.kd_poli != 'IGDK'
         ", [$selected_date]);
 
@@ -51,7 +50,7 @@ class DatetimePasienController extends Controller
     LEFT JOIN mutasi_berkas ON mutasi_berkas.no_rawat = reg_periksa.no_rawat
     LEFT JOIN pemeriksaan_ralan ON pemeriksaan_ralan.no_rawat = reg_periksa.no_rawat
     WHERE reg_periksa.tgl_registrasi = ?
-    AND reg_periksa.status_lanjut = 'Ralan'
+    AND reg_periksa.kd_poli != 'IGDK'
 ", [$selected_date]);
 
         foreach ($results as $row) {
