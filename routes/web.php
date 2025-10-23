@@ -8,6 +8,7 @@ use App\Http\Controllers\KlaimController;
 use App\Http\Controllers\ReferensiMjknController;
 use App\Http\Controllers\SinkronSepController;
 use App\Http\Controllers\SirsController;
+use App\Http\Controllers\TindakanExportController;
 use Illuminate\Support\Facades\Route;
 
 // Route::get('/', function () {
@@ -65,6 +66,8 @@ Route::prefix('sirs')->name('sirs.')->middleware('auth.session')->group(function
 });
 Route::get('/detil-tindakan/data', [DetilTindakanController::class, 'loadData'])
     ->name('detil-tindakan.data');
+Route::post('/export-tindakan', [TindakanExportController::class, 'export'])->name('export.tindakan');
+Route::post('/export-tindakan-csv', [TindakanExportController::class, 'exportCsv'])->name('export.tindakan.csv');
 
 Route::post('/logout', function () {
     session()->forget('is_logged_in');
@@ -73,4 +76,3 @@ Route::post('/logout', function () {
 
 // Route::get('/',[AutoBillingController::class, 'index'])->name('autobilling.index');
 // Route::post('/',[AutoBillingController::class, 'store_all'])->name('nota_jalan.store_all');
-

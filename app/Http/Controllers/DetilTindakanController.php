@@ -30,20 +30,255 @@ class DetilTindakanController extends Controller
         $jaminan      = $request->get('jaminan', 'bpjs');
         $status_bayar = $request->get('status_bayar', "Sudah Bayar");
 
+        $get_detil['total'] = 0;
+        $get_detil['file']  = 0;
+        // dd('');
+        $sql = "
+            SELECT
+                pasien.nm_pasien,
+                reg_periksa.no_rawat,
+                reg_periksa.no_rkm_medis,
+                COALESCE(dokter_dpjp.kd_dokter, dokter_reg.kd_dokter) AS kd_dokter,
+                COALESCE(dokter_dpjp.nm_dokter, dokter_reg.nm_dokter) AS nm_dokter,
+                penjab.png_jawab AS jaminan,
+                poliklinik.nm_poli AS layanan_asal
+            FROM reg_periksa
+            INNER JOIN dokter AS dokter_reg
+                ON reg_periksa.kd_dokter = dokter_reg.kd_dokter
+            LEFT JOIN (
+                SELECT no_rawat, MIN(kd_dokter) AS kd_dokter
+                FROM dpjp_ranap
+                GROUP BY no_rawat
+            ) AS dpjp_pertama
+                ON dpjp_pertama.no_rawat = reg_periksa.no_rawat
+            LEFT JOIN dokter AS dokter_dpjp
+                ON dpjp_pertama.kd_dokter = dokter_dpjp.kd_dokter
+            INNER JOIN penjab
+                ON reg_periksa.kd_pj = penjab.kd_pj
+            INNER JOIN poliklinik
+                ON reg_periksa.kd_poli = poliklinik.kd_poli
+            INNER JOIN pasien
+                ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
+            WHERE reg_periksa.status_bayar = ?
+            AND reg_periksa.tgl_registrasi BETWEEN ? AND ?
+        ";
+
+        $params = [$status_bayar, $tanggalAwal, $tanggalAkhir];
+
+        // Filter jaminan
+        if ($jaminan === 'umum') {
+            $sql .= " AND reg_periksa.kd_pj = ?";
+            $params[] = 'A09';
+        } elseif ($jaminan === 'bpjs') {
+            $sql .= " AND reg_periksa.kd_pj = ?";
+            $params[] = 'BPJ';
+        } else {
+            $sql .= " AND reg_periksa.kd_pj != ? AND reg_periksa.kd_pj != ?";
+            $params[] = 'A09';
+            $params[] = 'BPJ';
+        }
+
+        // Filter jenis pelayanan
+        if ($jnsPelayanan == 1) {
+            $sql .= " AND reg_periksa.status_lanjut = 'Ranap'";
+        } elseif ($jnsPelayanan == 2) {
+            $sql .= " AND reg_periksa.status_lanjut = 'Ralan'";
+        } elseif ($jnsPelayanan == 3) {
+            $sql .= " AND reg_periksa.status_lanjut = 'Ranap' AND reg_periksa.kd_poli = 'IGDK'";
+        }
+        // $sql .= "  LIMIT $limit OFFSET $offset";
+        if ($jaminan == 'bpjs') {
+            if ($jnsPelayanan != 4) {
+                $jp      = $jnsPelayanan == 3 ? 1 : $jnsPelayanan;
+                $periode = new \DatePeriod(
+                    new \DateTime($tanggalAwal),
+                    new \DateInterval('P1D'),
+                    (new \DateTime($tanggalAkhir))->modify('+1 day')
+                );
+
+                $allKlaim    = [];
+                $httpcode    = 200;
+                $statusKlaim = 3;
+
+// Direktori cache utama
+                $cacheDir = storage_path('app/cache_bpjs');
+                if (! file_exists($cacheDir)) {
+                    mkdir($cacheDir, 0777, true);
+                }
+
+                foreach ($periode as $dt) {
+                    $tgl       = $dt->format('Y-m-d');
+                    $url       = "$this->baseUrl/Monitoring/Klaim/Tanggal/$tgl/JnsPelayanan/$jp/Status/$statusKlaim";
+                    $cacheFile = $cacheDir . '/' . md5($url) . '.json';
+                    $cacheTime = 6 * 3600; // cache 6 jam
+
+                    $dataKlaim = [];
+
+                    // 🔹 Cek apakah file cache masih valid
+                    if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $cacheTime) {
+                        $dataKlaim = json_decode(file_get_contents($cacheFile), true);
+                        if (! is_array($dataKlaim)) {
+                            $dataKlaim = [];
+                        }
+
+                        // logger("Cache hit $tgl");
+                    } else {
+                        // 🔹 Hit API baru
+                        $result   = get_ws_bpjs($url);
+                        $response = $result['response'] ?? null;
+                        $key      = $result['key'] ?? '';
+
+                        if ($response && method_exists($response, 'status')) {
+                            $httpcode = $response->status();
+
+                            if ($httpcode == 200 && $response->body()) {
+                                $dec = $response->json();
+
+                                if (! empty($dec['response'])) {
+                                    $hasilRes  = @lz_decompress(string_decrypt($key, $dec['response']));
+                                    $dataAp    = json_decode($hasilRes, true);
+                                    $dataKlaim = $dataAp['klaim'] ?? [];
+                                }
+                            }
+                        }
+
+                        // 🔹 Simpan hasil baru ke cache
+                        file_put_contents(
+                            $cacheFile,
+                            json_encode($dataKlaim, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+                        );
+                    }
+
+                    // 🔹 Jika hasil kosong, skip biar tidak loop terus
+                    if (empty($dataKlaim)) {
+                        continue;
+                    }
+
+                    // 🔹 Proses langsung data klaim hari itu
+                    foreach ($dataKlaim as $data_bpjs) {
+                        $noSEP = $data_bpjs['noSEP'] ?? null;
+                        if (empty($noSEP)) {
+                            continue;
+                        }
+
+                        // === Cache per SEP ===
+                        $cacheDirSep = storage_path('app/cache_sep');
+                        if (! file_exists($cacheDirSep)) {
+                            mkdir($cacheDirSep, 0777, true);
+                        }
+
+                        $cacheFileSep = $cacheDirSep . '/' . $noSEP . '.json';
+                        $cacheTimeSep = 24 * 3600;
+
+                        if (file_exists($cacheFileSep) && (time() - filemtime($cacheFileSep)) < $cacheTimeSep) {
+                            $get_sep = json_decode(file_get_contents($cacheFileSep), true);
+                        } else {
+                            $get_sep = get_sep_bpjs($noSEP);
+                            file_put_contents($cacheFileSep, json_encode($get_sep, JSON_PRETTY_PRINT));
+                        }
+
+                        // === Tentukan DPJP ===
+                        if ($jnsPelayanan == 1 || $jnsPelayanan == 3) {
+                            $kd_dpjp = $get_sep['kontrol']['kdDokter'] ?? '';
+                            $nm_dpjp = $get_sep['kontrol']['nmDokter'] ?? '';
+                        } else {
+                            $kd_dpjp = $get_sep['dpjp']['kdDPJP'] ?? '';
+                            $nm_dpjp = $get_sep['dpjp']['nmDPJP'] ?? '';
+                        }
+                        $sql_reg = "
+            SELECT
+                pasien.nm_pasien,
+                reg_periksa.no_rawat,
+                reg_periksa.no_rkm_medis,
+                penjab.png_jawab AS jaminan,
+                poliklinik.nm_poli AS layanan_asal
+            FROM reg_periksa
+            INNER JOIN penjab
+                ON reg_periksa.kd_pj = penjab.kd_pj
+            INNER JOIN poliklinik
+                ON reg_periksa.kd_poli = poliklinik.kd_poli
+            INNER JOIN pasien
+                ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
+            WHERE pasien.no_peserta = ? AND reg_periksa.tgl_registrasi = ?
+                ";
+                        $sql_bsep = "
+            SELECT
+                pasien.nm_pasien,
+                reg_periksa.no_rawat,
+                reg_periksa.no_rkm_medis,
+                penjab.png_jawab AS jaminan,
+                poliklinik.nm_poli AS layanan_asal
+            FROM reg_periksa
+            INNER JOIN bridging_sep
+                ON reg_periksa.no_rawat = bridging_sep.no_rawat
+            INNER JOIN penjab
+                ON reg_periksa.kd_pj = penjab.kd_pj
+            INNER JOIN poliklinik
+                ON reg_periksa.kd_poli = poliklinik.kd_poli
+            INNER JOIN pasien
+                ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
+            WHERE bridging_sep.no_sep = ?
+                ";
+                        // === Ambil data rawat dari DB ===
+                        $bSep = DB::select($sql_bsep, [$noSEP]);
+                        if (empty($bSep)) {
+                            $_data = DB::select($sql_reg, [$data_bpjs['peserta']['noKartu'], $data_bpjs['tglSep']]);
+                        } else {
+                            $_data = $bSep;
+                        }
+
+                        if (empty($_data)) {
+                            continue;
+                        }
+
+                        // === Filter dan rakit data ===
+                        $rowData = $_data[0];
+                        if ($jnsPelayanan == 3 && ! in_array($rowData->layanan_asal, ['IGD', 'IGDK'])) {
+                            continue;
+                        }
+
+                        $row               = new \stdClass();
+                        $row->no_rawat     = $rowData->no_rawat;
+                        $row->no_rkm_medis = $rowData->no_rkm_medis;
+                        $row->nm_pasien    = $rowData->nm_pasien;
+                        $row->layanan_asal = $rowData->layanan_asal;
+                        $row->jaminan      = $rowData->jaminan;
+                        $row->kd_dokter    = $kd_dpjp;
+                        $row->nm_dokter    = $nm_dpjp;
+
+                        $allKlaim[] = $row;
+                    }
+
+                    // 🔹 Hapus variabel besar tiap iterasi untuk hemat RAM
+                    unset($dataKlaim, $dataAp, $hasilRes);
+                }
+
+                // dd($data);
+                $get_detil = get_data_detil_tindakan($allKlaim, $jnsPelayanan, $tanggalAwal, $tanggalAkhir, $jaminan, $status_bayar);
+                // dd(count($get_detil));
+
+            }
+
+        } else {
+            $data = DB::select($sql, $params);
+
+            $get_detil = get_data_detil_tindakan($data, $jnsPelayanan, $tanggalAwal, $tanggalAkhir, $jaminan, $status_bayar);
+        }
+
         // dd($noRawats);
 
-        // dd($get_detil);
-        $get_detil = [];
-        $allKeys   = [];
-        if (! empty($get_detil)) {
-            $firstRow = (array) $get_detil[0];
-            $allKeys  = array_keys($firstRow);
-        }
-        $allKeys = array_unique($allKeys);
+        // dd($get_detil['total']);
+        // $get_detil = [];
+        // $allKeys = [];
+        // if (! empty($get_detil)) {
+        //     $firstRow = (array) $get_detil[0];
+        //     $allKeys  = array_keys($firstRow);
+        // }
+        // $allKeys = array_unique($allKeys);
 
         return view('keuangan.detil-tindakan.index', [
-            'flattened'    => $get_detil,
-            'allKeys'      => $allKeys,
+            'total'        => $get_detil['total'],
+            'filepath'     => $get_detil['file'],
             'tanggalAwal'  => $tanggalAwal,
             'tanggalAkhir' => $tanggalAkhir,
             'jaminan'      => $jaminan,
@@ -53,6 +288,11 @@ class DetilTindakanController extends Controller
     }
     public function loadData(Request $request)
     {
+        set_time_limit(300); // 5 menit
+        ini_set('max_execution_time', 300);
+        ini_set('display_errors', 1);
+        ini_set('display_startup_errors', 1);
+        error_reporting(E_ALL);
         $offset = $request->get('offset', 0);
         $limit  = $request->get('limit', 200); // ambil 200 baris per batch
 
@@ -111,13 +351,13 @@ class DetilTindakanController extends Controller
         if ($jnsPelayanan == 1) {
             $sql .= " AND reg_periksa.status_lanjut = 'Ranap'";
         } elseif ($jnsPelayanan == 2) {
-            $sql .= " AND reg_periksa.status_lanjut = 'Ralan' AND reg_periksa.kd_poli != 'IGDK'";
+            $sql .= " AND reg_periksa.status_lanjut = 'Ralan'";
         } elseif ($jnsPelayanan == 3) {
-            $sql .= " AND reg_periksa.status_lanjut = 'Ralan' AND reg_periksa.kd_poli = 'IGDK'";
+            $sql .= " AND reg_periksa.status_lanjut = 'Ranap' AND reg_periksa.kd_poli = 'IGDK'";
         }
         // $sql .= "  LIMIT $limit OFFSET $offset";
         if ($jaminan == 'bpjs') {
-            $jp      = $jnsPelayanan == 3 ? 2 : $jnsPelayanan;
+            $jp      = $jnsPelayanan == 3 ? 1 : $jnsPelayanan;
             $periode = new \DatePeriod(
                 new \DateTime($tanggalAwal),
                 new \DateInterval('P1D'),
@@ -127,44 +367,93 @@ class DetilTindakanController extends Controller
             $allKlaim    = [];
             $httpcode    = 200;
             $statusKlaim = 3;
+
+// Direktori cache utama
+            $cacheDir = storage_path('app/cache_bpjs');
+            if (! file_exists($cacheDir)) {
+                mkdir($cacheDir, 0777, true);
+            }
+
             foreach ($periode as $dt) {
-                $tgl = $dt->format('Y-m-d');
-                $url = "$this->baseUrl/Monitoring/Klaim/Tanggal/$tgl/JnsPelayanan/$jp/Status/$statusKlaim";
+                $tgl       = $dt->format('Y-m-d');
+                $url       = "$this->baseUrl/Monitoring/Klaim/Tanggal/$tgl/JnsPelayanan/$jp/Status/$statusKlaim";
+                $cacheFile = $cacheDir . '/' . md5($url) . '.json';
+                $cacheTime = 6 * 3600; // cache 6 jam
 
-                $result   = get_ws_bpjs($url);
-                $response = $result['response'];
-                $key      = $result['key'];
-                $httpcode = $response->status();
+                $dataKlaim = [];
 
-                if ($httpcode == 200 && $response->body()) {
-                    $dec = $response->json();
-                    if (! empty($dec['response'])) {
-                        $hasilRes = lz_decompress(string_decrypt($key, $dec['response']));
-                        $datsaAp  = json_decode($hasilRes, true);
-                        // dump($datsaAp);
-                        if (! empty($datsaAp['klaim'])) {
-                            if ($jnsPelayanan == 3) {
-                                $filtered = array_filter($datsaAp['klaim'], function ($item) {
-                                    return isset($item['poli']) && $item['poli'] === 'INSTALASI GAWAT DARURAT';
-                                });
+                // 🔹 Cek apakah file cache masih valid
+                if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $cacheTime) {
+                    $dataKlaim = json_decode(file_get_contents($cacheFile), true);
+                    if (! is_array($dataKlaim)) {
+                        $dataKlaim = [];
+                    }
 
-                                // gabungkan ke allKlaim
-                                $allKlaim = array_merge($allKlaim, $filtered);
-                            } else if ($jnsPelayanan == 2) {
-                                $filtered = array_filter($datsaAp['klaim'], function ($item) {
-                                    return isset($item['poli']) && $item['poli'] !== 'INSTALASI GAWAT DARURAT';
-                                });
+                    // logger("Cache hit $tgl");
+                } else {
+                    // 🔹 Hit API baru
+                    $result   = get_ws_bpjs($url);
+                    $response = $result['response'] ?? null;
+                    $key      = $result['key'] ?? '';
 
-                                // gabungkan ke allKlaim
-                                $allKlaim = array_merge($allKlaim, $filtered);
-                            } else {
-                                $allKlaim = array_merge($allKlaim, $datsaAp['klaim']);
+                    if ($response && method_exists($response, 'status')) {
+                        $httpcode = $response->status();
+
+                        if ($httpcode == 200 && $response->body()) {
+                            $dec = $response->json();
+
+                            if (! empty($dec['response'])) {
+                                $hasilRes  = @lz_decompress(string_decrypt($key, $dec['response']));
+                                $dataAp    = json_decode($hasilRes, true);
+                                $dataKlaim = $dataAp['klaim'] ?? [];
                             }
                         }
                     }
+
+                    // 🔹 Simpan hasil baru ke cache
+                    file_put_contents(
+                        $cacheFile,
+                        json_encode($dataKlaim, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+                    );
                 }
-            }
-            $sql_reg = "
+
+                // 🔹 Jika hasil kosong, skip biar tidak loop terus
+                if (empty($dataKlaim)) {
+                    continue;
+                }
+
+                // 🔹 Proses langsung data klaim hari itu
+                foreach ($dataKlaim as $data_bpjs) {
+                    $noSEP = $data_bpjs['noSEP'] ?? null;
+                    if (empty($noSEP)) {
+                        continue;
+                    }
+
+                    // === Cache per SEP ===
+                    $cacheDirSep = storage_path('app/cache_sep');
+                    if (! file_exists($cacheDirSep)) {
+                        mkdir($cacheDirSep, 0777, true);
+                    }
+
+                    $cacheFileSep = $cacheDirSep . '/' . $noSEP . '.json';
+                    $cacheTimeSep = 24 * 3600;
+
+                    if (file_exists($cacheFileSep) && (time() - filemtime($cacheFileSep)) < $cacheTimeSep) {
+                        $get_sep = json_decode(file_get_contents($cacheFileSep), true);
+                    } else {
+                        $get_sep = get_sep_bpjs($noSEP);
+                        file_put_contents($cacheFileSep, json_encode($get_sep, JSON_PRETTY_PRINT));
+                    }
+
+                    // === Tentukan DPJP ===
+                    if ($jnsPelayanan == 1 || $jnsPelayanan == 3) {
+                        $kd_dpjp = $get_sep['kontrol']['kdDokter'] ?? '';
+                        $nm_dpjp = $get_sep['kontrol']['nmDokter'] ?? '';
+                    } else {
+                        $kd_dpjp = $get_sep['dpjp']['kdDPJP'] ?? '';
+                        $nm_dpjp = $get_sep['dpjp']['nmDPJP'] ?? '';
+                    }
+                    $sql_reg = "
             SELECT
                 pasien.nm_pasien,
                 reg_periksa.no_rawat,
@@ -180,7 +469,7 @@ class DetilTindakanController extends Controller
                 ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
             WHERE pasien.no_peserta = ? AND reg_periksa.tgl_registrasi = ?
                 ";
-            $sql_bsep = "
+                    $sql_bsep = "
             SELECT
                 pasien.nm_pasien,
                 reg_periksa.no_rawat,
@@ -198,65 +487,64 @@ class DetilTindakanController extends Controller
                 ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
             WHERE bridging_sep.no_sep = ?
                 ";
-            $noRawats = [];
-            $data     = [];
-            foreach ($allKlaim as $data_bpjs) {
-
-                if ($jnsPelayanan == 1) {
-                    $get_sep = get_sep_bpjs($data_bpjs['noSEP']);
-                    $kd_dpjp = $get_sep['kontrol']['kdDokter'] ?? '';
-                    $nm_dpjp = $get_sep['kontrol']['nmDokter'] ?? '';
-                    // dd($get_sep);
-                } else {
-                    $get_sep = get_sep_bpjs($data_bpjs['noSEP']);
-                    $kd_dpjp = $get_sep['dpjp']['kdDPJP'] ?? '';
-                    $nm_dpjp = $get_sep['dpjp']['nmDPJP'] ?? '';
-                }
-                $bSep = DB::select($sql_bsep, [$data_bpjs['noSEP']]);
-                if ($bSep == null) {
-                    $_data = DB::select($sql_reg, [$data_bpjs['peserta']['noKartu'], $data_bpjs['tglSep']]);
-                    if (count($_data) == 0) {
-                        $no_rawat = null;
+                    // === Ambil data rawat dari DB ===
+                    $bSep = DB::select($sql_bsep, [$noSEP]);
+                    if (empty($bSep)) {
+                        $_data = DB::select($sql_reg, [$data_bpjs['peserta']['noKartu'], $data_bpjs['tglSep']]);
                     } else {
-                        $noRawats[]        = $_data[0]->no_rawat;
-                        $row               = new \stdClass();
-                        $row->no_rawat     = $_data[0]->no_rawat;
-                        $row->no_rkm_medis = $_data[0]->no_rkm_medis;
-                        $row->nm_pasien    = $_data[0]->nm_pasien;
-                        $row->layanan_asal = $_data[0]->layanan_asal;
-                        $row->jaminan      = $_data[0]->jaminan;
-                        $row->kd_dokter    = $kd_dpjp;
-                        $row->nm_dokter    = $nm_dpjp;
-
-                        $data[] = $row;
+                        $_data = $bSep;
                     }
-                } else {
-                    $noRawats[]        = $bSep[0]->no_rawat;
+
+                    if (empty($_data)) {
+                        continue;
+                    }
+
+                    // === Filter dan rakit data ===
+                    $rowData = $_data[0];
+                    if ($jnsPelayanan == 3 && ! in_array($rowData->layanan_asal, ['IGD', 'IGDK'])) {
+                        continue;
+                    }
+
                     $row               = new \stdClass();
-                    $row->no_rawat     = $bSep[0]->no_rawat;
-                    $row->no_rkm_medis = $bSep[0]->no_rkm_medis;
-                    $row->nm_pasien    = $bSep[0]->nm_pasien;
-                    $row->layanan_asal = $bSep[0]->layanan_asal;
-                    $row->jaminan      = $bSep[0]->jaminan;
+                    $row->no_rawat     = $rowData->no_rawat;
+                    $row->no_rkm_medis = $rowData->no_rkm_medis;
+                    $row->nm_pasien    = $rowData->nm_pasien;
+                    $row->layanan_asal = $rowData->layanan_asal;
+                    $row->jaminan      = $rowData->jaminan;
                     $row->kd_dokter    = $kd_dpjp;
                     $row->nm_dokter    = $nm_dpjp;
 
-                    $data[] = $row;
+                    $allKlaim[] = $row;
                 }
+
+                // 🔹 Hapus variabel besar tiap iterasi untuk hemat RAM
+                unset($dataKlaim, $dataAp, $hasilRes);
             }
+
             // dd($data);
-            $get_detil = get_data_detil_tindakan($data);
+            $get_detil = get_data_detil_tindakan($allKlaim, $jnsPelayanan, $tanggalAwal, $tanggalAkhir, $jaminan, $status_bayar);
+
         } else {
             $data = DB::select($sql, $params);
 
-            $get_detil = get_data_detil_tindakan($data);
+            $get_detil = get_data_detil_tindakan($data, $jnsPelayanan, $tanggalAwal, $tanggalAkhir, $jaminan, $status_bayar);
+        }
+        if ($jaminan == 'bpjs') {
+            return response()->json([
+                'file'   => $get_detil['file'],  // path file JSON
+                'total'  => $get_detil['total'], // total baris
+                'offset' => 0,
+                'done'   => true,
+            ]);
+        } else {
+            return response()->json([
+                'file'   => $get_detil['file'],
+                'total'  => $get_detil['total'],
+                'offset' => $offset + $limit,
+                'done'   => count($data) < $limit,
+            ]);
         }
 
-        return response()->json([
-            'data'   => $get_detil,
-            'offset' => $offset + $limit,
-            'done'   => count($data) < $limit,
-        ]);
     }
 
     public function export(Request $request)
