@@ -942,37 +942,21 @@ if (! function_exists('get_data_detil_tindakan')) {
             return ['file' => null, 'total' => 0, 'message' => 'Tidak ada data.'];
         }
 
-        // Buat folder public/json_output
+        // Buat folder public/json_output (bisa diakses lewat URL)
         $dir = storage_path('app/public/json_output');
         if (! file_exists($dir)) {
             mkdir($dir, 0777, true);
         }
 
-        // Nama file berdasarkan filter
-        $filename = sprintf(
-            'tindakan_jns%s_%s_%s_jaminan%s_status%s.json',
-            $jns,
-            str_replace('-', '', $tanggalAwal),
-            str_replace('-', '', $tanggalAkhir),
-            $jaminan,
-            str_replace(' ', '_', $status_bayar)
-        );
+        // Nama file unik
+        $filename = 'tindakan_' . date('Ymd_His') . '.json';
         $filepath = $dir . '/' . $filename;
-
-        // Jika file sudah ada, langsung return tanpa generate ulang
-        if (file_exists($filepath)) {
-            return [
-                'file'    => $filepath,
-                'total'   => null, // total bisa dihitung saat export pakai generator
-                'message' => 'Data sudah ada, tidak perlu generate ulang',
-            ];
-        }
 
         // Mulai tulis JSON manual
         $handle = fopen($filepath, 'w');
         fwrite($handle, "[\n");
 
-        // Ambil semua data batch sesuai jenis
+        // Ambil semua data batch
         if ($jns == 1) {
             $data_rawat = get_detil_tindakan_ranap_batch($noRawats);
         } elseif ($jns == 2) {
@@ -988,6 +972,7 @@ if (! function_exists('get_data_detil_tindakan')) {
         $data_lab       = get_lab_detil_batch($noRawats);
         $data_farmasi   = get_farmasi_detil_batch($noRawats);
 
+        // Helper untuk group by no_rawat
         $groupByNoRawat = function ($data, $key = 'no_rawat') {
             $grouped = [];
             foreach ($data as $d) {
@@ -1004,6 +989,7 @@ if (! function_exists('get_data_detil_tindakan')) {
 
         $first       = true;
         $lastNoRawat = null;
+        $totalRows   = 0;
 
         foreach ($data_reg as $item) {
             $no = $item->no_rawat;
@@ -1031,8 +1017,10 @@ if (! function_exists('get_data_detil_tindakan')) {
                 if (! $first) {
                     fwrite($handle, ",\n");
                 }
+
                 fwrite($handle, json_encode($row, JSON_UNESCAPED_UNICODE));
                 $first = false;
+                $totalRows++;
             }
             unset($data);
         }
@@ -1040,9 +1028,12 @@ if (! function_exists('get_data_detil_tindakan')) {
         fwrite($handle, "\n]");
         fclose($handle);
 
+        // URL publik biar bisa diakses dari browser (bukan file:///)
+        $publicUrl = asset('storage/json_output/' . $filename);
+
         return [
-            'file'    => $filepath,
-            'total'   => null,
+            'file'    => $filepath, // ← URL HTTP valid
+            'total'   => $totalRows,
             'message' => 'Data disimpan ke JSON agar tidak memakan memori besar',
         ];
     }
