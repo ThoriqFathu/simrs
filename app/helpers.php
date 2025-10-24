@@ -947,6 +947,20 @@ if (! function_exists('get_data_detil_tindakan')) {
         if (! file_exists($dir)) {
             mkdir($dir, 0777, true);
         }
+        // === 2. Hapus file lama jika lebih dari 4 ===
+        $files = glob($dir . '/tindakan_*.json');
+        if (count($files) >= 3) {
+            // Urutkan berdasarkan waktu modifikasi (terlama dulu)
+            usort($files, function ($a, $b) {
+                return filemtime($a) <=> filemtime($b);
+            });
+
+            // Hapus file paling lama (sisakan 3 yang terbaru)
+            $toDelete = array_slice($files, 0, count($files) - 2);
+            foreach ($toDelete as $f) {
+                @unlink($f);
+            }
+        }
 
         // Nama file unik
         $filename = 'tindakan_' . date('Ymd_His') . '.json';
