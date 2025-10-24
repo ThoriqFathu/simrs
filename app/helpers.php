@@ -971,7 +971,6 @@ if (! function_exists('get_data_detil_tindakan')) {
         $data_radiologi = get_radiologi_detil_batch($noRawats);
         $data_lab       = get_lab_detil_batch($noRawats);
         $data_farmasi   = get_farmasi_detil_batch($noRawats);
-
         // Helper untuk group by no_rawat
         $groupByNoRawat = function ($data, $key = 'no_rawat') {
             $grouped = [];
@@ -986,6 +985,7 @@ if (! function_exists('get_data_detil_tindakan')) {
         $group_operasi   = $groupByNoRawat($data_operasi);
         $group_radiologi = $groupByNoRawat($data_radiologi);
         $group_lab       = $groupByNoRawat($data_lab);
+        $group_farmasi   = $groupByNoRawat($data_farmasi);
 
         $first       = true;
         $lastNoRawat = null;
@@ -998,7 +998,7 @@ if (! function_exists('get_data_detil_tindakan')) {
                 get_data_detil_unit($group_rawat[$no] ?? [], $item),
                 get_data_radiologi_detil($group_radiologi[$no] ?? [], $item),
                 get_data_lab_detil($group_lab[$no] ?? [], $item),
-                get_data_farmasi_detil($data_farmasi, $item),
+                get_data_farmasi_detil($group_farmasi[$no] ?? [], $item),
                 $group_operasi[$no] ?? []
             );
 
@@ -1048,7 +1048,8 @@ if (! function_exists('get_farmasi_detil_batch')) {
         }
 
         $in = implode(',', array_fill(0, count($noRawats), '?'));
-
+        // dump($noRawats);
+        // dd($in);
         $query = "
         SELECT
             ro.no_rawat,
@@ -1089,32 +1090,35 @@ if (! function_exists('get_data_farmasi_detil')) {
         // dd($data_tindakan);
         $hasil = [];
         foreach ($data_tindakan as $data) {
+            // dump($data);
             $nama_dokter = in_array($data->kode_brng, $pelayanan_kode) ? '' : $data->nm_dokter;
             $margin      = in_array($data->kode_brng, $pelayanan_kode) ? '' : ($data->total - ($data->h_beli * $data->jml));
+            if (in_array($data->kode_brng, $pelayanan_kode)) {
+                $hasil[] = [
+                    "waktu"            => $data->tgl_perawatan . " " . $data->jam,
+                    "no_rawat"         => $item->no_rawat,
+                    "mr"               => $item->no_rkm_medis,
+                    "nama_pasien"      => $item->nm_pasien,
+                    "layanan_asal"     => $item->layanan_asal,
+                    "jaminan"          => $item->jaminan,
+                    "kd_dpjp"          => $item->kd_dokter,
+                    "dpjp"             => $item->nm_dokter,
+                    "kode"             => $data->kode_brng,
+                    "keterangan"       => $data->nama_brng,
+                    "layanan"          => "FARMASI",
+                    "dokter_pelaksana" => $nama_dokter,
+                    "dokter_operator"  => "",
+                    "asisten_operator" => "",
+                    "dokter_anestesi"  => "",
+                    "asisten_anestesi" => "",
+                    "dokter_anak"      => "",
+                    "instrumen"        => "",
+                    "paramedis"        => "",
+                    "margin_obat"      => $margin,
+                    "total"            => $data->total,
+                ];
+            }
 
-            $hasil[] = [
-                "waktu"            => $data->tgl_perawatan . " " . $data->jam,
-                "no_rawat"         => $item->no_rawat,
-                "mr"               => $item->no_rkm_medis,
-                "nama_pasien"      => $item->nm_pasien,
-                "layanan_asal"     => $item->layanan_asal,
-                "jaminan"          => $item->jaminan,
-                "kd_dpjp"          => $item->kd_dokter,
-                "dpjp"             => $item->nm_dokter,
-                "kode"             => $data->kode_brng,
-                "keterangan"       => $data->nama_brng,
-                "layanan"          => "FARMASI",
-                "dokter_pelaksana" => $nama_dokter,
-                "dokter_operator"  => "",
-                "asisten_operator" => "",
-                "dokter_anestesi"  => "",
-                "asisten_anestesi" => "",
-                "dokter_anak"      => "",
-                "instrumen"        => "",
-                "paramedis"        => "",
-                "margin_obat"      => $margin,
-                "total"            => $data->total,
-            ];
         }
         // dump($hasil);
         return $hasil;
