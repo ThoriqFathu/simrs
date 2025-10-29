@@ -1748,27 +1748,127 @@ if (! function_exists('get_detil_tindakan_ranap_batch')) {
     {
         $in = implode(',', array_fill(0, count($noRawats), '?'));
 
-        $query = "
-            SELECT r.no_rawat, d.nm_dokter, NULL as nama_paramedis,NULL as kode_paramedis,
-                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
-                   j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
+        // $query = "
+        //     SELECT r.no_rawat, d.nm_dokter, NULL as nama_paramedis,NULL as kode_paramedis,
+        //            tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
+        //            j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
 
-            -- 💡 Menentukan ruang (bangsal) berdasarkan waktu tindakan
-            (
-                SELECT bangsal.kd_bangsal
-                FROM kamar_inap
-                INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
-                INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
-                WHERE kamar_inap.no_rawat = r.no_rawat
-                AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
-                    BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
-                        AND CONCAT(
-                            IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), '9999-12-31'),
-                            ' ',
-                            IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
-                        )
-                LIMIT 1
-            ) AS ruang_tindakan
+        //     -- 💡 Menentukan ruang (bangsal) berdasarkan waktu tindakan
+        //     (
+        //         SELECT bangsal.kd_bangsal
+        //         FROM kamar_inap
+        //         INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+        //         INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+        //         WHERE kamar_inap.no_rawat = r.no_rawat
+        //         AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+        //             BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
+        //                 AND CONCAT(
+        //                     IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), '9999-12-31'),
+        //                     ' ',
+        //                     IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+        //                 )
+        //         LIMIT 1
+        //     ) AS ruang_tindakan
+        //     FROM rawat_inap_dr r
+        //     INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+        //     INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
+        //     INNER JOIN jns_perawatan_inap j ON j.kd_jenis_prw = r.kd_jenis_prw
+        //     INNER JOIN bangsal b ON j.kd_bangsal = b.kd_bangsal
+        //     INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+        //     WHERE r.no_rawat IN ($in)
+
+        //     UNION ALL
+
+        //     SELECT r.no_rawat, d.nm_dokter, pt.nama as nama_paramedis,pt.nip as kode_paramedis,
+        //            tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
+        //            j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
+
+        //     -- 💡 Menentukan ruang (bangsal) berdasarkan waktu tindakan
+        //     (
+        //         SELECT bangsal.kd_bangsal
+        //         FROM kamar_inap
+        //         INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+        //         INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+        //         WHERE kamar_inap.no_rawat = r.no_rawat
+        //         AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+        //             BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
+        //                 AND CONCAT(
+        //                     IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), '9999-12-31'),
+        //                     ' ',
+        //                     IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+        //                 )
+        //         LIMIT 1
+        //     ) AS ruang_tindakan
+        //     FROM rawat_inap_drpr r
+        //     INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+        //     INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
+        //     INNER JOIN petugas pt ON pt.nip = r.nip
+        //     INNER JOIN jns_perawatan_inap j ON j.kd_jenis_prw = r.kd_jenis_prw
+        //     INNER JOIN bangsal b ON j.kd_bangsal = b.kd_bangsal
+        //     INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+        //     WHERE r.no_rawat IN ($in)
+
+        //     UNION ALL
+
+        //     SELECT r.no_rawat, NULL as nm_dokter, pt.nama as nama_paramedis,pt.nip as kode_paramedis,
+        //            tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
+        //            j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
+
+        //     -- 💡 Menentukan ruang (bangsal) berdasarkan waktu tindakan
+        //     (
+        //         SELECT bangsal.kd_bangsal
+        //         FROM kamar_inap
+        //         INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+        //         INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+        //         WHERE kamar_inap.no_rawat = r.no_rawat
+        //         AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+        //             BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
+        //                 AND CONCAT(
+        //                     IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), '9999-12-31'),
+        //                     ' ',
+        //                     IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+        //                 )
+        //         LIMIT 1
+        //     ) AS ruang_tindakan
+        //     FROM rawat_inap_pr r
+        //     INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+        //     INNER JOIN petugas pt ON pt.nip = r.nip
+        //     INNER JOIN jns_perawatan_inap j ON j.kd_jenis_prw = r.kd_jenis_prw
+        //     INNER JOIN bangsal b ON j.kd_bangsal = b.kd_bangsal
+        //     INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+        //     WHERE r.no_rawat IN ($in)
+        // ";
+        $query = "
+            SELECT r.no_rawat, d.nm_dokter, NULL AS nama_paramedis, NULL AS kode_paramedis,
+                tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
+                j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
+
+                -- 💡 Menentukan ruang (bangsal) berdasarkan waktu tindakan
+                (
+                    SELECT bangsal.kd_bangsal
+                    FROM kamar_inap
+                    INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+                    INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+                    WHERE kamar_inap.no_rawat = r.no_rawat
+                    AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+                        BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
+                            AND CONCAT(
+                                IF(
+                                    kamar_inap.tgl_keluar IS NULL
+                                    OR kamar_inap.tgl_keluar = '0000-00-00',
+                                    '9999-12-31',
+                                    kamar_inap.tgl_keluar
+                                ),
+                                ' ',
+                                IF(
+                                    kamar_inap.jam_keluar IS NULL
+                                    OR kamar_inap.jam_keluar = '00:00:00',
+                                    '23:59:59',
+                                    kamar_inap.jam_keluar
+                                )
+                            )
+                    LIMIT 1
+                ) AS ruang_tindakan
             FROM rawat_inap_dr r
             INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
             INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
@@ -1779,26 +1879,35 @@ if (! function_exists('get_detil_tindakan_ranap_batch')) {
 
             UNION ALL
 
-            SELECT r.no_rawat, d.nm_dokter, pt.nama as nama_paramedis,pt.nip as kode_paramedis,
-                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
-                   j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
+            SELECT r.no_rawat, d.nm_dokter, pt.nama AS nama_paramedis, pt.nip AS kode_paramedis,
+                tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
+                j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
 
-            -- 💡 Menentukan ruang (bangsal) berdasarkan waktu tindakan
-            (
-                SELECT bangsal.kd_bangsal
-                FROM kamar_inap
-                INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
-                INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
-                WHERE kamar_inap.no_rawat = r.no_rawat
-                AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
-                    BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
-                        AND CONCAT(
-                            IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), '9999-12-31'),
-                            ' ',
-                            IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
-                        )
-                LIMIT 1
-            ) AS ruang_tindakan
+                (
+                    SELECT bangsal.kd_bangsal
+                    FROM kamar_inap
+                    INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+                    INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+                    WHERE kamar_inap.no_rawat = r.no_rawat
+                    AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+                        BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
+                            AND CONCAT(
+                                IF(
+                                    kamar_inap.tgl_keluar IS NULL
+                                    OR kamar_inap.tgl_keluar = '0000-00-00',
+                                    '9999-12-31',
+                                    kamar_inap.tgl_keluar
+                                ),
+                                ' ',
+                                IF(
+                                    kamar_inap.jam_keluar IS NULL
+                                    OR kamar_inap.jam_keluar = '00:00:00',
+                                    '23:59:59',
+                                    kamar_inap.jam_keluar
+                                )
+                            )
+                    LIMIT 1
+                ) AS ruang_tindakan
             FROM rawat_inap_drpr r
             INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
             INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
@@ -1810,26 +1919,35 @@ if (! function_exists('get_detil_tindakan_ranap_batch')) {
 
             UNION ALL
 
-            SELECT r.no_rawat, NULL as nm_dokter, pt.nama as nama_paramedis,pt.nip as kode_paramedis,
-                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
-                   j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
+            SELECT r.no_rawat, NULL AS nm_dokter, pt.nama AS nama_paramedis, pt.nip AS kode_paramedis,
+                tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
+                j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
 
-            -- 💡 Menentukan ruang (bangsal) berdasarkan waktu tindakan
-            (
-                SELECT bangsal.kd_bangsal
-                FROM kamar_inap
-                INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
-                INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
-                WHERE kamar_inap.no_rawat = r.no_rawat
-                AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
-                    BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
-                        AND CONCAT(
-                            IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), '9999-12-31'),
-                            ' ',
-                            IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
-                        )
-                LIMIT 1
-            ) AS ruang_tindakan
+                (
+                    SELECT bangsal.kd_bangsal
+                    FROM kamar_inap
+                    INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+                    INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+                    WHERE kamar_inap.no_rawat = r.no_rawat
+                    AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+                        BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
+                            AND CONCAT(
+                                IF(
+                                    kamar_inap.tgl_keluar IS NULL
+                                    OR kamar_inap.tgl_keluar = '0000-00-00',
+                                    '9999-12-31',
+                                    kamar_inap.tgl_keluar
+                                ),
+                                ' ',
+                                IF(
+                                    kamar_inap.jam_keluar IS NULL
+                                    OR kamar_inap.jam_keluar = '00:00:00',
+                                    '23:59:59',
+                                    kamar_inap.jam_keluar
+                                )
+                            )
+                    LIMIT 1
+                ) AS ruang_tindakan
             FROM rawat_inap_pr r
             INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
             INNER JOIN petugas pt ON pt.nip = r.nip
