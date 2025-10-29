@@ -129,38 +129,56 @@ class DetilTindakanController extends Controller
                     $dataKlaim = [];
 
                     // 🔹 Cek apakah file cache masih valid
-                    if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $cacheTime) {
-                        $dataKlaim = json_decode(file_get_contents($cacheFile), true);
-                        if (! is_array($dataKlaim)) {
-                            $dataKlaim = [];
-                        }
+                    // if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $cacheTime) {
+                    //     $dataKlaim = json_decode(file_get_contents($cacheFile), true);
+                    //     if (! is_array($dataKlaim)) {
+                    //         $dataKlaim = [];
+                    //     }
 
-                        // logger("Cache hit $tgl");
-                    } else {
-                        // 🔹 Hit API baru
-                        $result   = get_ws_bpjs($url);
-                        $response = $result['response'] ?? null;
-                        $key      = $result['key'] ?? '';
+                    //     // logger("Cache hit $tgl");
+                    // } else {
+                    //     // 🔹 Hit API baru
+                    //     $result   = get_ws_bpjs($url);
+                    //     $response = $result['response'] ?? null;
+                    //     $key      = $result['key'] ?? '';
 
-                        if ($response && method_exists($response, 'status')) {
-                            $httpcode = $response->status();
+                    //     if ($response && method_exists($response, 'status')) {
+                    //         $httpcode = $response->status();
 
-                            if ($httpcode == 200 && $response->body()) {
-                                $dec = $response->json();
+                    //         if ($httpcode == 200 && $response->body()) {
+                    //             $dec = $response->json();
 
-                                if (! empty($dec['response'])) {
-                                    $hasilRes  = @lz_decompress(string_decrypt($key, $dec['response']));
-                                    $dataAp    = json_decode($hasilRes, true);
-                                    $dataKlaim = $dataAp['klaim'] ?? [];
-                                }
+                    //             if (! empty($dec['response'])) {
+                    //                 $hasilRes  = @lz_decompress(string_decrypt($key, $dec['response']));
+                    //                 $dataAp    = json_decode($hasilRes, true);
+                    //                 $dataKlaim = $dataAp['klaim'] ?? [];
+                    //             }
+                    //         }
+                    //     }
+
+                    //     // 🔹 Simpan hasil baru ke cache
+                    //     file_put_contents(
+                    //         $cacheFile,
+                    //         json_encode($dataKlaim, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+                    //     );
+                    // }
+
+                    $result   = get_ws_bpjs($url);
+                    $response = $result['response'] ?? null;
+                    $key      = $result['key'] ?? '';
+
+                    if ($response && method_exists($response, 'status')) {
+                        $httpcode = $response->status();
+
+                        if ($httpcode == 200 && $response->body()) {
+                            $dec = $response->json();
+
+                            if (! empty($dec['response'])) {
+                                $hasilRes  = @lz_decompress(string_decrypt($key, $dec['response']));
+                                $dataAp    = json_decode($hasilRes, true);
+                                $dataKlaim = $dataAp['klaim'] ?? [];
                             }
                         }
-
-                        // 🔹 Simpan hasil baru ke cache
-                        file_put_contents(
-                            $cacheFile,
-                            json_encode($dataKlaim, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
-                        );
                     }
 
                     // 🔹 Jika hasil kosong, skip biar tidak loop terus
@@ -184,12 +202,13 @@ class DetilTindakanController extends Controller
                         $cacheFileSep = $cacheDirSep . '/' . $noSEP . '.json';
                         $cacheTimeSep = 24 * 3600;
 
-                        if (file_exists($cacheFileSep) && (time() - filemtime($cacheFileSep)) < $cacheTimeSep) {
-                            $get_sep = json_decode(file_get_contents($cacheFileSep), true);
-                        } else {
-                            $get_sep = get_sep_bpjs($noSEP);
-                            file_put_contents($cacheFileSep, json_encode($get_sep, JSON_PRETTY_PRINT));
-                        }
+                        // if (file_exists($cacheFileSep) && (time() - filemtime($cacheFileSep)) < $cacheTimeSep) {
+                        //     $get_sep = json_decode(file_get_contents($cacheFileSep), true);
+                        // } else {
+                        //     $get_sep = get_sep_bpjs($noSEP);
+                        //     file_put_contents($cacheFileSep, json_encode($get_sep, JSON_PRETTY_PRINT));
+                        // }
+                        $get_sep = get_sep_bpjs($noSEP);
 
                         // === Tentukan DPJP ===
                         if ($jnsPelayanan == 1 || $jnsPelayanan == 3) {
