@@ -1230,14 +1230,14 @@ if (! function_exists('get_farmasi_detil_batch')) {
                 WHERE kamar_inap.no_rawat = ro.no_rawat
                 AND CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
                     BETWEEN CONCAT(
-                        COALESCE(NULLIF(kamar_inap.tgl_masuk, '0000-00-00'), '1900-01-01'),
+                        IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
                         ' ',
                         IFNULL(kamar_inap.jam_masuk, '00:00:00')
                     )
                     AND CONCAT(
-                        COALESCE(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), '9999-12-31'),
+                        IFNULL(NULLIF(CAST(kamar_inap.tgl_keluar AS CHAR), '0000-00-00'), '9999-12-31'),
                         ' ',
-                        COALESCE(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                        IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
                     )
                 LIMIT 1
             ),
@@ -1250,12 +1250,12 @@ if (! function_exists('get_farmasi_detil_batch')) {
                     INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
                     WHERE kamar_inap.no_rawat = ro.no_rawat
                     AND CONCAT(
-                        COALESCE(NULLIF(kamar_inap.tgl_masuk, '0000-00-00'), '1900-01-01'),
+                        IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
                         ' ',
                         IFNULL(kamar_inap.jam_masuk, '00:00:00')
                     ) > CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
                     ORDER BY CONCAT(
-                        COALESCE(NULLIF(kamar_inap.tgl_masuk, '0000-00-00'), '1900-01-01'),
+                        IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
                         ' ',
                         IFNULL(kamar_inap.jam_masuk, '00:00:00')
                     ) ASC
@@ -1269,16 +1269,18 @@ if (! function_exists('get_farmasi_detil_batch')) {
                     INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
                     WHERE kamar_inap.no_rawat = ro.no_rawat
                     AND CONCAT(
-                        COALESCE(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'),
-                                 NULLIF(kamar_inap.tgl_masuk, '0000-00-00')),
+                        IFNULL(NULLIF(CAST(
+                            IFNULL(kamar_inap.tgl_keluar, kamar_inap.tgl_masuk) AS CHAR
+                        ), '0000-00-00'), '1900-01-01'),
                         ' ',
-                        COALESCE(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                        IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
                     ) < CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
                     ORDER BY CONCAT(
-                        COALESCE(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'),
-                                 NULLIF(kamar_inap.tgl_masuk, '0000-00-00')),
+                        IFNULL(NULLIF(CAST(
+                            IFNULL(kamar_inap.tgl_keluar, kamar_inap.tgl_masuk) AS CHAR
+                        ), '0000-00-00'), '1900-01-01'),
                         ' ',
-                        COALESCE(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                        IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
                     ) DESC
                     LIMIT 1
                 )
@@ -1826,11 +1828,13 @@ if (! function_exists('get_detil_tindakan_ranap_batch')) {
             INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
             WHERE kamar_inap.no_rawat = r.no_rawat
             AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
-                BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
+                BETWEEN CONCAT(
+                    IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
+                    ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00')
+                )
                 AND CONCAT(
-                    COALESCE(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), '9999-12-31'),
-                    ' ',
-                    COALESCE(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                    IFNULL(NULLIF(CAST(kamar_inap.tgl_keluar AS CHAR), '0000-00-00'), '9999-12-31'),
+                    ' ', IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
                 )
             LIMIT 1
         ) AS ruang_tindakan
@@ -1847,7 +1851,6 @@ if (! function_exists('get_detil_tindakan_ranap_batch')) {
     SELECT r.no_rawat, d.nm_dokter, pt.nama AS nama_paramedis, pt.nip AS kode_paramedis,
         tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
         j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
-
         (
             SELECT bangsal.kd_bangsal
             FROM kamar_inap
@@ -1855,11 +1858,13 @@ if (! function_exists('get_detil_tindakan_ranap_batch')) {
             INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
             WHERE kamar_inap.no_rawat = r.no_rawat
             AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
-                BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
+                BETWEEN CONCAT(
+                    IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
+                    ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00')
+                )
                 AND CONCAT(
-                    COALESCE(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), '9999-12-31'),
-                    ' ',
-                    COALESCE(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                    IFNULL(NULLIF(CAST(kamar_inap.tgl_keluar AS CHAR), '0000-00-00'), '9999-12-31'),
+                    ' ', IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
                 )
             LIMIT 1
         ) AS ruang_tindakan
@@ -1877,7 +1882,6 @@ if (! function_exists('get_detil_tindakan_ranap_batch')) {
     SELECT r.no_rawat, NULL AS nm_dokter, pt.nama AS nama_paramedis, pt.nip AS kode_paramedis,
         tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
         j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
-
         (
             SELECT bangsal.kd_bangsal
             FROM kamar_inap
@@ -1885,11 +1889,13 @@ if (! function_exists('get_detil_tindakan_ranap_batch')) {
             INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
             WHERE kamar_inap.no_rawat = r.no_rawat
             AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
-                BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
+                BETWEEN CONCAT(
+                    IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
+                    ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00')
+                )
                 AND CONCAT(
-                    COALESCE(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), '9999-12-31'),
-                    ' ',
-                    COALESCE(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                    IFNULL(NULLIF(CAST(kamar_inap.tgl_keluar AS CHAR), '0000-00-00'), '9999-12-31'),
+                    ' ', IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
                 )
             LIMIT 1
         ) AS ruang_tindakan
