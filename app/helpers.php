@@ -159,8 +159,12 @@ if (! function_exists('get_ws_bpjs')) {
             "X-signature"  => $encodedSignature,
             "Content-Type" => "application/json; charset=utf-8",
         ];
-        $response = Http::withHeaders($headers)->get($url);
-        $key      = get_key($tStamp);
+        // $response = Http::withHeaders($headers)->get($url);
+        $response = Http::withHeaders($headers)
+            ->connectTimeout(15) // waktu maksimal mencoba membuka koneksi (detik)
+            ->timeout(120)       // waktu maksimal menunggu respons penuh (detik)
+            ->get($url);
+        $key = get_key($tStamp);
         // return 2 nilai sebagai array
         return [
             'key'      => $key,
