@@ -529,23 +529,8 @@ if (! function_exists('get_data_unit')) {
             $nm_perawatan = strtolower((string) $data->nm_perawatan);
             $kd_bangsal   = strtolower((string) $data->kd_bangsal);
             $kd_prw       = strtolower((string) $data->kd_jenis_prw);
+            $kd_ruang     = strtolower((string) $data->ruang_tindakan);
             $nm_pasien    = strtolower(str_replace('.', '', (string) $data->nm_pasien));
-
-            $unit = 'ranap'; // default fallback
-
-            if (str_contains($kd_bangsal, 'nicu') || str_contains($kd_prw, 'nicu')) {
-                $unit = 'nicu';
-            } elseif (str_contains($kd_bangsal, 'icu') || str_contains($kd_prw, 'icu')) {
-                $unit = 'icu';
-            } elseif (str_contains($nm_perawatan, 'gizi')) {
-                $unit = 'gizi';
-            } elseif (str_contains($nm_perawatan, 'vk') || str_contains($kd_prw, 'vk')) {
-                $unit = 'vk';
-            } elseif (str_contains($nm_perawatan, 'cssd') || str_contains($kd_prw, 'cssd')) {
-                $unit = 'cssd';
-            } elseif (str_contains($nm_perawatan, 'rehabilitasi') || str_contains($kd_prw, 'rehabilitasi')) {
-                $unit = 'rehabilitasi';
-            }
 
             $unit = 'ranap'; // default fallback
             if (str_contains($nm_perawatan, 'cssd') || str_contains($kd_prw, 'cssd')) {
@@ -561,6 +546,39 @@ if (! function_exists('get_data_unit')) {
             } elseif (str_contains($kd_bangsal, 'icu') || str_contains($kd_prw, 'icu')) {
                 $unit = 'icu';
                 // dd($data);
+            }
+            if (in_array(strtolower($kd_bangsal), array_map('strtolower', data_bangsal_vk()))) {
+                $unit_bangsal = 'VK';
+            } else if (str_contains($kd_bangsal, 'nicu')) {
+                $unit_bangsal = 'nicu';
+            } else if (str_contains($kd_bangsal, 'icu')) {
+                $unit_bangsal = 'icu';
+            } else {
+                $unit_bangsal = 'ranap';
+            }
+
+            if ($kd_ruang) {
+
+                if (in_array(strtolower($kd_ruang), array_map('strtolower', data_bangsal_vk()))) {
+                    $ruang_tindakan = 'vk';
+                } else if (str_contains($kd_ruang, 'nicu')) {
+                    $ruang_tindakan = 'nicu';
+                } else if (str_contains($kd_ruang, 'icu')) {
+                    $ruang_tindakan = 'icu';
+                } else {
+                    $ruang_tindakan = 'ranap';
+                }
+            } else {
+                // dd($kd_ruang, $unit_bangsal);
+                $ruang_tindakan = $unit_bangsal;
+            }
+
+            if (($unit != 'cssd') && ($unit != 'gizi')) {
+                if (($unit == 'ranap') && ($ruang_tindakan != 'ranap')) {
+                    $unit = $ruang_tindakan;
+                } else if (($unit == 'VK') && ($ruang_tindakan != 'VK')) {
+                    $unit = $ruang_tindakan;
+                }
             }
 
             // Masukkan data ke unit
@@ -708,10 +726,28 @@ if (! function_exists('get_ranap_dokter')) {
     function get_ranap_dokter($no_rawat)
     {
         $data = DB::select("
-        SELECT pasien.nm_pasien,rawat_inap_dr.biaya_rawat, jns_perawatan_inap.kd_jenis_prw, nm_perawatan, bangsal.kd_bangsal, NULL AS kode_paramedis
+        SELECT pasien.nm_pasien,r.biaya_rawat, jns_perawatan_inap.kd_jenis_prw, nm_perawatan, bangsal.kd_bangsal, NULL AS kode_paramedis,
+        -- 💡 Menentukan ruang (bangsal) berdasarkan waktu tindakan
+        (
+            SELECT bangsal.kd_bangsal
+            FROM kamar_inap
+            INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+            INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+            WHERE kamar_inap.no_rawat = r.no_rawat
+            AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+                BETWEEN CONCAT(
+                    IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
+                    ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00')
+                )
+                AND CONCAT(
+                    IFNULL(NULLIF(CAST(kamar_inap.tgl_keluar AS CHAR), '0000-00-00'), '9999-12-31'),
+                    ' ', IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                )
+            LIMIT 1
+        ) AS ruang_tindakan
         FROM reg_periksa
-        INNER JOIN rawat_inap_dr ON rawat_inap_dr.no_rawat=reg_periksa.no_rawat
-        INNER JOIN jns_perawatan_inap ON jns_perawatan_inap.kd_jenis_prw=rawat_inap_dr.kd_jenis_prw
+        INNER JOIN rawat_inap_dr r ON r.no_rawat=reg_periksa.no_rawat
+        INNER JOIN jns_perawatan_inap ON jns_perawatan_inap.kd_jenis_prw=r.kd_jenis_prw
         INNER JOIN bangsal ON jns_perawatan_inap.kd_bangsal=bangsal.kd_bangsal
         INNER JOIN pasien ON pasien.no_rkm_medis=reg_periksa.no_rkm_medis
         WHERE reg_periksa.no_rawat = ?
@@ -733,10 +769,28 @@ if (! function_exists('get_ranap_paramedis')) {
 
         //     return $total->total_biaya;
         $data = DB::select("
-        SELECT pasien.nm_pasien, rawat_inap_pr.biaya_rawat, jns_perawatan_inap.kd_jenis_prw, nm_perawatan, bangsal.kd_bangsal, rawat_inap_pr.nip AS kode_paramedis
+        SELECT pasien.nm_pasien, r.biaya_rawat, jns_perawatan_inap.kd_jenis_prw, nm_perawatan, bangsal.kd_bangsal, r.nip AS kode_paramedis,
+        -- 💡 Menentukan ruang (bangsal) berdasarkan waktu tindakan
+        (
+            SELECT bangsal.kd_bangsal
+            FROM kamar_inap
+            INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+            INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+            WHERE kamar_inap.no_rawat = r.no_rawat
+            AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+                BETWEEN CONCAT(
+                    IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
+                    ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00')
+                )
+                AND CONCAT(
+                    IFNULL(NULLIF(CAST(kamar_inap.tgl_keluar AS CHAR), '0000-00-00'), '9999-12-31'),
+                    ' ', IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                )
+            LIMIT 1
+        ) AS ruang_tindakan
         FROM reg_periksa
-        INNER JOIN rawat_inap_pr ON rawat_inap_pr.no_rawat=reg_periksa.no_rawat
-        INNER JOIN jns_perawatan_inap ON jns_perawatan_inap.kd_jenis_prw=rawat_inap_pr.kd_jenis_prw
+        INNER JOIN rawat_inap_pr r ON r.no_rawat=reg_periksa.no_rawat
+        INNER JOIN jns_perawatan_inap ON jns_perawatan_inap.kd_jenis_prw=r.kd_jenis_prw
         INNER JOIN bangsal ON jns_perawatan_inap.kd_bangsal=bangsal.kd_bangsal
         INNER JOIN pasien ON pasien.no_rkm_medis=reg_periksa.no_rkm_medis
         WHERE reg_periksa.no_rawat = ?
@@ -748,10 +802,28 @@ if (! function_exists('get_ranap_dokter_paramedis')) {
     function get_ranap_dokter_paramedis($no_rawat)
     {
         $data = DB::select("
-        SELECT pasien.nm_pasien, rawat_inap_drpr.biaya_rawat, jns_perawatan_inap.kd_jenis_prw, nm_perawatan, bangsal.kd_bangsal, rawat_inap_drpr.nip AS kode_paramedis
+        SELECT pasien.nm_pasien, r.biaya_rawat, jns_perawatan_inap.kd_jenis_prw, nm_perawatan, bangsal.kd_bangsal, r.nip AS kode_paramedis,
+        -- 💡 Menentukan ruang (bangsal) berdasarkan waktu tindakan
+        (
+            SELECT bangsal.kd_bangsal
+            FROM kamar_inap
+            INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+            INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+            WHERE kamar_inap.no_rawat = r.no_rawat
+            AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+                BETWEEN CONCAT(
+                    IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
+                    ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00')
+                )
+                AND CONCAT(
+                    IFNULL(NULLIF(CAST(kamar_inap.tgl_keluar AS CHAR), '0000-00-00'), '9999-12-31'),
+                    ' ', IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                )
+            LIMIT 1
+        ) AS ruang_tindakan
         FROM reg_periksa
-        INNER JOIN rawat_inap_drpr ON rawat_inap_drpr.no_rawat=reg_periksa.no_rawat
-        INNER JOIN jns_perawatan_inap ON jns_perawatan_inap.kd_jenis_prw=rawat_inap_drpr.kd_jenis_prw
+        INNER JOIN rawat_inap_drpr r ON r.no_rawat=reg_periksa.no_rawat
+        INNER JOIN jns_perawatan_inap ON jns_perawatan_inap.kd_jenis_prw=r.kd_jenis_prw
         INNER JOIN bangsal ON jns_perawatan_inap.kd_bangsal=bangsal.kd_bangsal
         INNER JOIN pasien ON pasien.no_rkm_medis=reg_periksa.no_rkm_medis
         WHERE reg_periksa.no_rawat = ?
@@ -2150,6 +2222,7 @@ if (! function_exists('get_data_detil_unit')) {
                     $unit = 'ICU';
                     // dd($data);
                 }
+
                 // filter bangsal unit untuk tindakan yang dilakukan pada kamar
                 if (in_array(strtolower($kd_bangsal), array_map('strtolower', data_bangsal_vk()))) {
                     $unit_bangsal = 'VK';
@@ -2177,6 +2250,13 @@ if (! function_exists('get_data_detil_unit')) {
                     $ruang_tindakan = $unit_bangsal;
                 }
 
+                if (($unit != 'CSSD') && ($unit != 'GIZI')) {
+                    if (($unit == 'RANAP') && ($ruang_tindakan != 'RANAP')) {
+                        $unit = $ruang_tindakan;
+                    } else if (($unit == 'VK') && ($ruang_tindakan != 'VK')) {
+                        $unit = $ruang_tindakan;
+                    }
+                }
                 // Masukkan data ke unit
                 // $data_unit[$unit][] = $data;
                 $hasil[] = [
