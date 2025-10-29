@@ -1135,79 +1135,189 @@ if (! function_exists('get_farmasi_detil_batch')) {
         $in = implode(',', array_fill(0, count($noRawats), '?'));
         // dump($noRawats);
         // dd($in);
+        //     $query = "
+        //     SELECT
+        //         ro.no_rawat,
+        //         ro.tgl_perawatan,
+        //         ro.jam,
+        //         ro.kd_dokter,
+        //         dokter.nm_dokter,
+        //         dpo.kode_brng,
+        //         dpo.h_beli,
+        //         dpo.jml,
+        //         db.nama_brng,
+        //         dpo.total,
+        //         IFNULL(
+        //     (
+        //         -- Prioritas 1: kamar saat obat diberikan
+        //         SELECT bangsal.kd_bangsal
+        //         FROM kamar_inap
+        //         INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+        //         INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+        //         WHERE kamar_inap.no_rawat = ro.no_rawat
+        //         AND CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
+        //             BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
+        //                 AND CONCAT(
+        //                     IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), '9999-12-31'),
+        //                     ' ',
+        //                     IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+        //                 )
+        //         LIMIT 1
+        //     ),
+        //     IFNULL(
+        //         (
+        //         -- Prioritas 2: kamar pertama setelah waktu obat
+        //         SELECT bangsal.kd_bangsal
+        //         FROM kamar_inap
+        //         INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+        //         INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+        //         WHERE kamar_inap.no_rawat = ro.no_rawat
+        //             AND CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
+        //                 > CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
+        //         ORDER BY CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00')) ASC
+        //         LIMIT 1
+        //         ),
+        //         (
+        //         -- Prioritas 3: kamar terakhir sebelum waktu obat
+        //         SELECT bangsal.kd_bangsal
+        //         FROM kamar_inap
+        //         INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+        //         INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+        //         WHERE kamar_inap.no_rawat = ro.no_rawat
+        //             AND CONCAT(
+        //                 IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), kamar_inap.tgl_masuk),
+        //                 ' ',
+        //                 IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+        //                 )
+        //                 < CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
+        //         ORDER BY CONCAT(
+        //                 IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), kamar_inap.tgl_masuk),
+        //                 ' ',
+        //                 IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+        //                 ) DESC
+        //         LIMIT 1
+        //         )
+        //     )
+        //     ) AS kd_bangsal
+        //     FROM resep_obat ro
+        //     INNER JOIN detail_pemberian_obat dpo
+        //         ON ro.no_rawat = dpo.no_rawat
+        //         AND ro.tgl_perawatan = dpo.tgl_perawatan
+        //         AND ro.jam = dpo.jam
+        //     INNER JOIN databarang db ON dpo.kode_brng = db.kode_brng
+        //     INNER JOIN dokter ON ro.kd_dokter = dokter.kd_dokter
+        //     WHERE dpo.no_rawat IN ($in)
+        // ";
         $query = "
-        SELECT
-            ro.no_rawat,
-            ro.tgl_perawatan,
-            ro.jam,
-            ro.kd_dokter,
-            dokter.nm_dokter,
-            dpo.kode_brng,
-            dpo.h_beli,
-            dpo.jml,
-            db.nama_brng,
-            dpo.total,
-            IFNULL(
-        (
-            -- Prioritas 1: kamar saat obat diberikan
-            SELECT bangsal.kd_bangsal
-            FROM kamar_inap
-            INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
-            INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
-            WHERE kamar_inap.no_rawat = ro.no_rawat
-            AND CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
-                BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
-                    AND CONCAT(
-                        IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), '9999-12-31'),
-                        ' ',
-                        IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+            SELECT
+                ro.no_rawat,
+                ro.tgl_perawatan,
+                ro.jam,
+                ro.kd_dokter,
+                dokter.nm_dokter,
+                dpo.kode_brng,
+                dpo.h_beli,
+                dpo.jml,
+                db.nama_brng,
+                dpo.total,
+                IFNULL(
+                    (
+                        -- Prioritas 1: kamar saat obat diberikan
+                        SELECT bangsal.kd_bangsal
+                        FROM kamar_inap
+                        INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+                        INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+                        WHERE kamar_inap.no_rawat = ro.no_rawat
+                        AND CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
+                            BETWEEN CONCAT(
+                                kamar_inap.tgl_masuk, ' ',
+                                IFNULL(kamar_inap.jam_masuk, '00:00:00')
+                            )
+                            AND CONCAT(
+                                IF(
+                                    kamar_inap.tgl_keluar IS NULL
+                                    OR kamar_inap.tgl_keluar = '0000-00-00',
+                                    '9999-12-31',
+                                    kamar_inap.tgl_keluar
+                                ),
+                                ' ',
+                                IF(
+                                    kamar_inap.jam_keluar IS NULL
+                                    OR kamar_inap.jam_keluar = '00:00:00',
+                                    '23:59:59',
+                                    kamar_inap.jam_keluar
+                                )
+                            )
+                        LIMIT 1
+                    ),
+                    IFNULL(
+                        (
+                            -- Prioritas 2: kamar pertama setelah waktu obat
+                            SELECT bangsal.kd_bangsal
+                            FROM kamar_inap
+                            INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+                            INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+                            WHERE kamar_inap.no_rawat = ro.no_rawat
+                            AND CONCAT(
+                                kamar_inap.tgl_masuk, ' ',
+                                IFNULL(kamar_inap.jam_masuk, '00:00:00')
+                            ) > CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
+                            ORDER BY CONCAT(
+                                kamar_inap.tgl_masuk, ' ',
+                                IFNULL(kamar_inap.jam_masuk, '00:00:00')
+                            ) ASC
+                            LIMIT 1
+                        ),
+                        (
+                            -- Prioritas 3: kamar terakhir sebelum waktu obat
+                            SELECT bangsal.kd_bangsal
+                            FROM kamar_inap
+                            INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+                            INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+                            WHERE kamar_inap.no_rawat = ro.no_rawat
+                            AND CONCAT(
+                                IF(
+                                    kamar_inap.tgl_keluar IS NULL
+                                    OR kamar_inap.tgl_keluar = '0000-00-00',
+                                    kamar_inap.tgl_masuk,
+                                    kamar_inap.tgl_keluar
+                                ),
+                                ' ',
+                                IF(
+                                    kamar_inap.jam_keluar IS NULL
+                                    OR kamar_inap.jam_keluar = '00:00:00',
+                                    '23:59:59',
+                                    kamar_inap.jam_keluar
+                                )
+                            ) < CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
+                            ORDER BY CONCAT(
+                                IF(
+                                    kamar_inap.tgl_keluar IS NULL
+                                    OR kamar_inap.tgl_keluar = '0000-00-00',
+                                    kamar_inap.tgl_masuk,
+                                    kamar_inap.tgl_keluar
+                                ),
+                                ' ',
+                                IF(
+                                    kamar_inap.jam_keluar IS NULL
+                                    OR kamar_inap.jam_keluar = '00:00:00',
+                                    '23:59:59',
+                                    kamar_inap.jam_keluar
+                                )
+                            ) DESC
+                            LIMIT 1
+                        )
                     )
-            LIMIT 1
-        ),
-        IFNULL(
-            (
-            -- Prioritas 2: kamar pertama setelah waktu obat
-            SELECT bangsal.kd_bangsal
-            FROM kamar_inap
-            INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
-            INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
-            WHERE kamar_inap.no_rawat = ro.no_rawat
-                AND CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
-                    > CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
-            ORDER BY CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00')) ASC
-            LIMIT 1
-            ),
-            (
-            -- Prioritas 3: kamar terakhir sebelum waktu obat
-            SELECT bangsal.kd_bangsal
-            FROM kamar_inap
-            INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
-            INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
-            WHERE kamar_inap.no_rawat = ro.no_rawat
-                AND CONCAT(
-                    IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), kamar_inap.tgl_masuk),
-                    ' ',
-                    IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
-                    )
-                    < CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
-            ORDER BY CONCAT(
-                    IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), kamar_inap.tgl_masuk),
-                    ' ',
-                    IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
-                    ) DESC
-            LIMIT 1
-            )
-        )
-        ) AS kd_bangsal
-        FROM resep_obat ro
-        INNER JOIN detail_pemberian_obat dpo
-            ON ro.no_rawat = dpo.no_rawat
-            AND ro.tgl_perawatan = dpo.tgl_perawatan
-            AND ro.jam = dpo.jam
-        INNER JOIN databarang db ON dpo.kode_brng = db.kode_brng
-        INNER JOIN dokter ON ro.kd_dokter = dokter.kd_dokter
-        WHERE dpo.no_rawat IN ($in)
-    ";
+                ) AS kd_bangsal
+            FROM resep_obat ro
+            INNER JOIN detail_pemberian_obat dpo
+                ON ro.no_rawat = dpo.no_rawat
+                AND ro.tgl_perawatan = dpo.tgl_perawatan
+                AND ro.jam = dpo.jam
+            INNER JOIN databarang db ON dpo.kode_brng = db.kode_brng
+            INNER JOIN dokter ON ro.kd_dokter = dokter.kd_dokter
+            WHERE dpo.no_rawat IN ($in)
+        ";
 
         return DB::select($query, $noRawats);
     }
