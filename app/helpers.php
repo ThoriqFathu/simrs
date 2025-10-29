@@ -5,22 +5,59 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use LZCompressor\LZString;
 
-if (! function_exists('get_name_rs')) {
-    function cache_get($key)
-    {
-        $path = "cache/sepKlaim/{$key}.json";
-        if (Storage::exists($path)) {
-            $json = Storage::get($path);
-            return json_decode($json, true);
-        }
-        return null;
+function cache_get($key)
+{
+    $path = "cache/sepKlaim/{$key}.json";
+    if (Storage::exists($path)) {
+        $json = Storage::get($path);
+        return json_decode($json, true);
     }
+    return null;
+}
 
-    function cache_put($key, $data)
+function cache_put($key, $data)
+{
+    $path = "cache/sepKlaim/{$key}.json";
+    Storage::put($path, json_encode($data, JSON_PRETTY_PRINT));
+}
+if (! function_exists('data_petugas_vk_ponek')) {
+    function data_petugas_vk_ponek()
     {
-        $path = "cache/sepKlaim/{$key}.json";
-        Storage::put($path, json_encode($data, JSON_PRETTY_PRINT));
+        $kode = [
+            "PWT052",
+            "PWT037",
+            "PWT076",
+            "PWT071",
+            "PWT021",
+            "PWT102",
+            "PWT045",
+            "PWT112",
+            "PWT031",
+            "PWT083",
+            "PWT148",
+            "PWT056",
+            "PWT026",
+            "PWT082",
+            "PWT092",
+            "PWT096",
+            "PWT046",
+            "PWT176",
+        ];
+        return $kode;
     }
+}
+if (! function_exists('data_bangsal_vk')) {
+    function data_bangsal_vk()
+    {
+        $kode = [
+            "kl3.8",
+            "kl3.9",
+        ];
+        return $kode;
+    }
+}
+
+if (! function_exists('get_name_rs')) {
     function get_name_rs()
     {
         return env('BPJS_CONS_ID') == 16303 ? 'RSUD Ketapang' : "RSIA HIKMAH SAWI";
@@ -408,7 +445,7 @@ if (! function_exists('get_data_khanza')) {
                 $ralan_paramedis        = get_ralan_paramedis($no_rawat);
                 $ralan_dokter           = get_ralan_dokter($no_rawat);
                 $ralan_dokter_paramedis = get_ralan_dokter_paramedis($no_rawat);
-                $total_ralan            = $ralan_paramedis + $ralan_dokter + $ralan_dokter_paramedis;
+                $total_ralan            = $ralan_paramedis['total'] + $ralan_dokter + $ralan_dokter_paramedis['total'];
                 $operasi                = get_operasi($no_rawat);
                 $ranap_paramedis        = get_ranap_paramedis($no_rawat);
                 $ranap_dokter           = get_ranap_dokter($no_rawat);
@@ -418,6 +455,7 @@ if (! function_exists('get_data_khanza')) {
                 $data_kamar             = get_tarif_kamar($no_rawat);
                 // dump($no_rawat);
                 // dump($data_unit);
+                $data_unit['vk']    = ($data_unit['vk'] ?? 0) + ($data_kamar['vk'] ?? 0);
                 $data_unit['nicu']  = ($data_unit['nicu'] ?? 0) + ($data_kamar['nicu'] ?? 0);
                 $data_unit['icu']   = ($data_unit['icu'] ?? 0) + ($data_kamar['icu'] ?? 0);
                 $data_unit['ranap'] = ($data_unit['ranap'] ?? 0) + ($data_kamar['ranap'] ?? 0);
@@ -427,9 +465,14 @@ if (! function_exists('get_data_khanza')) {
                 $radiologi       = get_radiologi($no_rawat);
                 $lab             = get_lab($no_rawat);
                 $resutls_farmasi = get_farmasi($no_rawat);
-                $map_poli        = get_map_poli($select_poli->nm_poli, $total_ralan);
-                $final           = array_replace($data_bpjs, $map_poli);
-                $final           = array_replace($final, $data_unit);
+                if ($ralan_dokter_paramedis['is_ponek'] || $ralan_paramedis['is_ponek']) {
+                    $map_poli = get_map_poli('PONEK', $total_ralan);
+
+                } else {
+                    $map_poli = get_map_poli($select_poli->nm_poli, $total_ralan);
+                }
+                $final = array_replace($data_bpjs, $map_poli);
+                $final = array_replace($final, $data_unit);
 
                 // dd($data_bpjs);
                 $item = [
@@ -460,23 +503,21 @@ if (! function_exists('get_data_unit')) {
     function get_data_unit($data_tindakan)
     {
         $data_unit = [
-            'cssd'         => [],
-            'rehabilitasi' => [],
-            'gizi'         => [],
-            'nicu'         => [],
-            'icu'          => [],
-            'vk'           => [],
-            'ranap'        => [],
+            'cssd'  => [],
+            'gizi'  => [],
+            'nicu'  => [],
+            'icu'   => [],
+            'vk'    => [],
+            'ranap' => [],
         ];
 
         $totals_per_unit = [
-            'cssd'         => 0,
-            'rehabilitasi' => 0,
-            'gizi'         => 0,
-            'nicu'         => 0,
-            'icu'          => 0,
-            'vk'           => 0,
-            'ranap'        => 0,
+            'cssd'  => 0,
+            'gizi'  => 0,
+            'nicu'  => 0,
+            'icu'   => 0,
+            'vk'    => 0,
+            'ranap' => 0,
         ];
         // dd($data_tindakan);
         foreach ($data_tindakan as $data) {
@@ -488,19 +529,10 @@ if (! function_exists('get_data_unit')) {
 
             $unit = 'ranap'; // default fallback
 
-            if (str_contains($nm_perawatan, 'nicu') || str_contains($nm_perawatan, 'icu')) {
-                if (str_contains($kd_bangsal, 'nicu')) {
-                    $unit = 'nicu';
-                } elseif (str_contains($kd_bangsal, 'icu') || str_contains($nm_perawatan, 'icu')) {
-                    $unit = 'icu';
-                } else {
-                    // cek nama pasien
-                    if (str_contains($nm_pasien, 'bayi nyonya') || str_contains($nm_pasien, 'by ny')) {
-                        $unit = 'nicu';
-                    } else {
-                        $unit = 'icu';
-                    }
-                }
+            if (str_contains($kd_bangsal, 'nicu') || str_contains($kd_prw, 'nicu')) {
+                $unit = 'nicu';
+            } elseif (str_contains($kd_bangsal, 'icu') || str_contains($kd_prw, 'icu')) {
+                $unit = 'icu';
             } elseif (str_contains($nm_perawatan, 'gizi')) {
                 $unit = 'gizi';
             } elseif (str_contains($nm_perawatan, 'vk') || str_contains($kd_prw, 'vk')) {
@@ -509,6 +541,22 @@ if (! function_exists('get_data_unit')) {
                 $unit = 'cssd';
             } elseif (str_contains($nm_perawatan, 'rehabilitasi') || str_contains($kd_prw, 'rehabilitasi')) {
                 $unit = 'rehabilitasi';
+            }
+
+            $unit = 'ranap'; // default fallback
+            if (str_contains($nm_perawatan, 'cssd') || str_contains($kd_prw, 'cssd')) {
+                $unit = 'cssd';
+            } elseif (str_contains($nm_perawatan, 'gizi') || str_contains($nm_perawatan, 'makan')) {
+                $unit = 'gizi';
+            } elseif (str_contains($nm_perawatan, 'vk') || str_contains($kd_prw, 'vk')) {
+                $unit = 'vk';
+            } elseif (in_array($data->kode_paramedis, data_petugas_vk_ponek()) || in_array(strtolower($kd_bangsal), array_map('strtolower', data_bangsal_vk()))) {
+                $unit = 'vk';
+            } elseif (str_contains($kd_bangsal, 'nicu') || str_contains($kd_prw, 'nicu')) {
+                $unit = 'nicu';
+            } elseif (str_contains($kd_bangsal, 'icu') || str_contains($kd_prw, 'icu')) {
+                $unit = 'icu';
+                // dd($data);
             }
 
             // Masukkan data ke unit
@@ -531,6 +579,7 @@ if (! function_exists('get_map_poli')) {
             "POLI PENYAKIT DALAM"  => 0,
             "POLI GIGI"            => 0,
             "IGD"                  => 0,
+            "PONEK"                => 0,
             "POLI KESEHATAN JIWA"  => 0,
             "POLI NYERI"           => 0,
             "POLI KANDUNGAN"       => 0,
@@ -551,15 +600,22 @@ if (! function_exists('get_ralan_paramedis')) {
     {
         $sql = "
             SELECT
-                IFNULL(SUM(rawat_jl_pr.biaya_rawat),0) AS total_biaya
+                IFNULL(SUM(rawat_jl_pr.biaya_rawat),0) AS total_biaya, MAX(rawat_jl_pr.nip) AS kode_paramedis
             FROM reg_periksa
             INNER JOIN rawat_jl_pr ON rawat_jl_pr.no_rawat = reg_periksa.no_rawat
             WHERE reg_periksa.no_rawat = ?
         ";
 
-        $total = DB::selectOne($sql, [$no_rawat]);
-
-        return $total->total_biaya; // sudah 0 kalau tidak ada data
+        $data     = DB::selectOne($sql, [$no_rawat]);
+        $is_ponek = false;
+        if (in_array($data->kode_paramedis, data_petugas_vk_ponek())) {
+            $is_ponek = true;
+        }
+        $result = [
+            'total'    => $data->total_biaya,
+            'is_ponek' => $is_ponek,
+        ];
+        return $result;
     }
 }
 
@@ -583,14 +639,21 @@ if (! function_exists('get_ralan_dokter')) {
 if (! function_exists('get_ralan_dokter_paramedis')) {
     function get_ralan_dokter_paramedis($no_rawat)
     {
-        $total = DB::selectOne("
-            SELECT IFNULL(SUM(rawat_jl_drpr.biaya_rawat),0) AS total_biaya
+        $data = DB::selectOne("
+            SELECT IFNULL(SUM(rawat_jl_drpr.biaya_rawat),0) AS total_biaya, MAX(rawat_jl_drpr.nip) AS kode_paramedis
             FROM reg_periksa
             INNER JOIN rawat_jl_drpr ON rawat_jl_drpr.no_rawat=reg_periksa.no_rawat
             WHERE reg_periksa.no_rawat = ?
         ", [$no_rawat]);
-
-        return $total->total_biaya;
+        $is_ponek = false;
+        if (in_array($data->kode_paramedis, data_petugas_vk_ponek())) {
+            $is_ponek = true;
+        }
+        $result = [
+            'total'    => $data->total_biaya,
+            'is_ponek' => $is_ponek,
+        ];
+        return $result;
     }
 }
 
@@ -641,7 +704,7 @@ if (! function_exists('get_ranap_dokter')) {
     function get_ranap_dokter($no_rawat)
     {
         $data = DB::select("
-        SELECT pasien.nm_pasien,rawat_inap_dr.biaya_rawat, jns_perawatan_inap.kd_jenis_prw, nm_perawatan, bangsal.kd_bangsal
+        SELECT pasien.nm_pasien,rawat_inap_dr.biaya_rawat, jns_perawatan_inap.kd_jenis_prw, nm_perawatan, bangsal.kd_bangsal, NULL AS kode_paramedis
         FROM reg_periksa
         INNER JOIN rawat_inap_dr ON rawat_inap_dr.no_rawat=reg_periksa.no_rawat
         INNER JOIN jns_perawatan_inap ON jns_perawatan_inap.kd_jenis_prw=rawat_inap_dr.kd_jenis_prw
@@ -666,7 +729,7 @@ if (! function_exists('get_ranap_paramedis')) {
 
         //     return $total->total_biaya;
         $data = DB::select("
-        SELECT pasien.nm_pasien, rawat_inap_pr.biaya_rawat, jns_perawatan_inap.kd_jenis_prw, nm_perawatan, bangsal.kd_bangsal
+        SELECT pasien.nm_pasien, rawat_inap_pr.biaya_rawat, jns_perawatan_inap.kd_jenis_prw, nm_perawatan, bangsal.kd_bangsal, rawat_inap_pr.nip AS kode_paramedis
         FROM reg_periksa
         INNER JOIN rawat_inap_pr ON rawat_inap_pr.no_rawat=reg_periksa.no_rawat
         INNER JOIN jns_perawatan_inap ON jns_perawatan_inap.kd_jenis_prw=rawat_inap_pr.kd_jenis_prw
@@ -681,7 +744,7 @@ if (! function_exists('get_ranap_dokter_paramedis')) {
     function get_ranap_dokter_paramedis($no_rawat)
     {
         $data = DB::select("
-        SELECT pasien.nm_pasien, rawat_inap_drpr.biaya_rawat, jns_perawatan_inap.kd_jenis_prw, nm_perawatan, bangsal.kd_bangsal
+        SELECT pasien.nm_pasien, rawat_inap_drpr.biaya_rawat, jns_perawatan_inap.kd_jenis_prw, nm_perawatan, bangsal.kd_bangsal, rawat_inap_drpr.nip AS kode_paramedis
         FROM reg_periksa
         INNER JOIN rawat_inap_drpr ON rawat_inap_drpr.no_rawat=reg_periksa.no_rawat
         INNER JOIN jns_perawatan_inap ON jns_perawatan_inap.kd_jenis_prw=rawat_inap_drpr.kd_jenis_prw
@@ -839,13 +902,16 @@ if (! function_exists('get_tarif_kamar')) {
         WHERE kamar_inap.no_rawat = ?
     ", [$no_rawat]);
         $total = [
+            'vk'    => 0,
             'nicu'  => 0,
             'icu'   => 0,
             'ranap' => 0,
         ];
         foreach ($data_kamar as $data) {
             $kd_bangsal = strtolower((string) $data->kd_bangsal);
-            if (str_contains($kd_bangsal, 'nicu')) {
+            if (in_array(strtolower($kd_bangsal), array_map('strtolower', data_bangsal_vk()))) {
+                $total['vk'] += $data->ttl_biaya;
+            } else if (str_contains($kd_bangsal, 'nicu')) {
                 $total['nicu'] += $data->ttl_biaya;
             } else if (str_contains($kd_bangsal, 'icu')) {
                 $total['icu'] += $data->ttl_biaya;
@@ -971,12 +1037,16 @@ if (! function_exists('get_data_detil_tindakan')) {
         fwrite($handle, "[\n");
 
         // Ambil semua data batch
+        $is_rawat_jalan = false;
         if ($jns == 1) {
-            $data_rawat = get_detil_tindakan_ranap_batch($noRawats);
+            $data_rawat     = get_detil_tindakan_ranap_batch($noRawats);
+            $is_rawat_jalan = false;
         } elseif ($jns == 2) {
-            $data_rawat = get_detil_tindakan_ralan_batch($noRawats, false);
+            $data_rawat     = get_detil_tindakan_ralan_batch($noRawats, false);
+            $is_rawat_jalan = true;
         } elseif ($jns == 3) {
-            $data_rawat = get_detil_tindakan_ralan_batch($noRawats, true);
+            $data_rawat     = get_detil_tindakan_ralan_batch($noRawats, true);
+            $is_rawat_jalan = true;
         } else {
             $data_rawat = get_detil_tindakan_rawat_batch($noRawats);
         }
@@ -995,7 +1065,8 @@ if (! function_exists('get_data_detil_tindakan')) {
             return $grouped;
         };
 
-        $group_rawat     = $groupByNoRawat($data_rawat);
+        $group_rawat = $groupByNoRawat($data_rawat);
+        // dd($group_rawat);
         $group_operasi   = $groupByNoRawat($data_operasi);
         $group_radiologi = $groupByNoRawat($data_radiologi);
         $group_lab       = $groupByNoRawat($data_lab);
@@ -1009,7 +1080,7 @@ if (! function_exists('get_data_detil_tindakan')) {
             $no = $item->no_rawat;
 
             $data = array_merge(
-                get_data_detil_unit($group_rawat[$no] ?? [], $item),
+                get_data_detil_unit($group_rawat[$no] ?? [], $item, $is_rawat_jalan),
                 get_data_radiologi_detil($group_radiologi[$no] ?? [], $item),
                 get_data_lab_detil($group_lab[$no] ?? [], $item),
                 get_data_farmasi_detil($group_farmasi[$no] ?? [], $item),
@@ -1075,14 +1146,66 @@ if (! function_exists('get_farmasi_detil_batch')) {
             dpo.h_beli,
             dpo.jml,
             db.nama_brng,
-            dpo.total
+            dpo.total,
+            IFNULL(
+        (
+            -- Prioritas 1: kamar saat obat diberikan
+            SELECT bangsal.kd_bangsal
+            FROM kamar_inap
+            INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+            INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+            WHERE kamar_inap.no_rawat = ro.no_rawat
+            AND CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
+                BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
+                    AND CONCAT(
+                        IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), '9999-12-31'),
+                        ' ',
+                        IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                    )
+            LIMIT 1
+        ),
+        IFNULL(
+            (
+            -- Prioritas 2: kamar pertama setelah waktu obat
+            SELECT bangsal.kd_bangsal
+            FROM kamar_inap
+            INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+            INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+            WHERE kamar_inap.no_rawat = ro.no_rawat
+                AND CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
+                    > CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
+            ORDER BY CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00')) ASC
+            LIMIT 1
+            ),
+            (
+            -- Prioritas 3: kamar terakhir sebelum waktu obat
+            SELECT bangsal.kd_bangsal
+            FROM kamar_inap
+            INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+            INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+            WHERE kamar_inap.no_rawat = ro.no_rawat
+                AND CONCAT(
+                    IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), kamar_inap.tgl_masuk),
+                    ' ',
+                    IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                    )
+                    < CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
+            ORDER BY CONCAT(
+                    IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), kamar_inap.tgl_masuk),
+                    ' ',
+                    IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                    ) DESC
+            LIMIT 1
+            )
+        )
+        ) AS kd_bangsal
         FROM resep_obat ro
         INNER JOIN detail_pemberian_obat dpo
             ON ro.no_rawat = dpo.no_rawat
             AND ro.tgl_perawatan = dpo.tgl_perawatan
             AND ro.jam = dpo.jam
-        INNER JOIN databarang db ON dpo.kode_brng=db.kode_brng
-        INNER JOIN dokter ON ro.kd_dokter=dokter.kd_dokter
+        INNER JOIN databarang db ON dpo.kode_brng = db.kode_brng
+        INNER JOIN dokter ON ro.kd_dokter = dokter.kd_dokter
         WHERE dpo.no_rawat IN ($in)
     ";
 
@@ -1101,35 +1224,50 @@ if (! function_exists('get_data_farmasi_detil')) {
             'FAR00623',
             'FAR00624',
         ];
-        // dd($data_tindakan);
         $hasil = [];
         foreach ($data_tindakan as $data) {
-            // dump($data);
             $nama_dokter = in_array($data->kode_brng, $pelayanan_kode) ? '' : $data->nm_dokter;
-            $margin      = in_array($data->kode_brng, $pelayanan_kode) ? '' : ($data->total - ($data->h_beli * $data->jml));
+
+            $margin = in_array($data->kode_brng, $pelayanan_kode) ? '' : ($data->total - ($data->h_beli * $data->jml));
             if (in_array($data->kode_brng, $pelayanan_kode)) {
+                $nama_dokter = $data->nm_dokter;
+                $kd_bangsal  = strtolower((string) $data->kd_bangsal);
+                if (in_array(strtolower($kd_bangsal), array_map('strtolower', data_bangsal_vk()))) {
+                    $unit = 'VK';
+                } else if (str_contains($kd_bangsal, 'nicu')) {
+                    $unit = 'NICU';
+                } else if (str_contains($kd_bangsal, 'icu')) {
+                    $unit = 'ICU';
+                } else {
+                    $unit = 'RANAP';
+                }
                 $hasil[] = [
-                    "waktu"            => $data->tgl_perawatan . " " . $data->jam,
-                    "no_rawat"         => $item->no_rawat,
-                    "mr"               => $item->no_rkm_medis,
-                    "nama_pasien"      => $item->nm_pasien,
-                    "layanan_asal"     => $item->layanan_asal,
-                    "jaminan"          => $item->jaminan,
-                    "kd_dpjp"          => $item->kd_dokter,
-                    "dpjp"             => $item->nm_dokter,
-                    "kode"             => $data->kode_brng,
-                    "keterangan"       => $data->nama_brng,
-                    "layanan"          => "FARMASI",
-                    "dokter_pelaksana" => $nama_dokter,
-                    "dokter_operator"  => "",
-                    "asisten_operator" => "",
-                    "dokter_anestesi"  => "",
-                    "asisten_anestesi" => "",
-                    "dokter_anak"      => "",
-                    "instrumen"        => "",
-                    "paramedis"        => "",
-                    "margin_obat"      => $margin,
-                    "total"            => $data->total,
+                    "waktu"              => $data->tgl_perawatan . " " . $data->jam,
+                    "no_rawat"           => $item->no_rawat,
+                    "mr"                 => $item->no_rkm_medis,
+                    "nama_pasien"        => $item->nm_pasien,
+                    "layanan_asal"       => $item->layanan_asal,
+                    "jaminan"            => $item->jaminan,
+                    "registrasi_kd_dpjp" => $item->reg_kd_dokter,
+                    "registrasi_dpjp"    => $item->reg_nm_dokter,
+                    "kd_dpjp"            => $item->kd_dokter,
+                    "dpjp"               => $item->nm_dokter,
+                    "kode"               => $data->kode_brng,
+                    "keterangan"         => $data->nama_brng,
+                    "layanan"            => "FARMASI",
+                    // "bangsal"            => "",
+                    "ruang_tindakan"     => $unit,
+                    // "kd_bangsal"         => $kd_bangsal,
+                    "dokter_pelaksana"   => $nama_dokter,
+                    "dokter_operator"    => "",
+                    "asisten_operator"   => "",
+                    "dokter_anestesi"    => "",
+                    "asisten_anestesi"   => "",
+                    "dokter_anak"        => "",
+                    "instrumen"          => "",
+                    "paramedis"          => "",
+                    "margin_obat"        => $margin,
+                    "total"              => $data->total,
                 ];
             }
 
@@ -1208,27 +1346,32 @@ if (! function_exists('get_data_lab_detil')) {
             $layanan = in_array($data->kd_jenis_prw, $kodeBankDarah) ? 'BANK DARAH' : 'LABORATORIUM';
 
             $hasil[] = [
-                "waktu"            => $data->tgl_periksa . " " . $data->jam,
-                "no_rawat"         => $item->no_rawat,
-                "mr"               => $item->no_rkm_medis,
-                "nama_pasien"      => $item->nm_pasien,
-                "layanan_asal"     => $item->layanan_asal,
-                "jaminan"          => $item->jaminan,
-                "kd_dpjp"          => $item->kd_dokter,
-                "dpjp"             => $item->nm_dokter,
-                "kode"             => $data->kd_jenis_prw,
-                "keterangan"       => $data->nm_perawatan,
-                "layanan"          => $layanan,
-                "dokter_pelaksana" => isset($data->nm_dokter) ? $data->nm_dokter : "",
-                "dokter_operator"  => "",
-                "asisten_operator" => "",
-                "dokter_anestesi"  => "",
-                "asisten_anestesi" => "",
-                "dokter_anak"      => "",
-                "instrumen"        => "",
-                "paramedis"        => isset($data->nama) ? $data->nama : "",
-                "margin_obat"      => "",
-                "total"            => $data->biaya,
+                "waktu"              => $data->tgl_periksa . " " . $data->jam,
+                "no_rawat"           => $item->no_rawat,
+                "mr"                 => $item->no_rkm_medis,
+                "nama_pasien"        => $item->nm_pasien,
+                "layanan_asal"       => $item->layanan_asal,
+                "jaminan"            => $item->jaminan,
+                "registrasi_kd_dpjp" => $item->reg_kd_dokter,
+                "registrasi_dpjp"    => $item->reg_nm_dokter,
+                "kd_dpjp"            => $item->kd_dokter,
+                "dpjp"               => $item->nm_dokter,
+                "kode"               => $data->kd_jenis_prw,
+                "keterangan"         => $data->nm_perawatan,
+                "layanan"            => $layanan,
+                // "bangsal"            => "",
+                "ruang_tindakan"     => "",
+                // "kd_bangsal"         => "",
+                "dokter_pelaksana"   => isset($data->nm_dokter) ? $data->nm_dokter : "",
+                "dokter_operator"    => "",
+                "asisten_operator"   => "",
+                "dokter_anestesi"    => "",
+                "asisten_anestesi"   => "",
+                "dokter_anak"        => "",
+                "instrumen"          => "",
+                "paramedis"          => isset($data->nama) ? $data->nama : "",
+                "margin_obat"        => "",
+                "total"              => $data->biaya,
             ];
         }
         return $hasil;
@@ -1381,27 +1524,32 @@ if (! function_exists('get_data_radiologi_detil')) {
         $hasil = [];
         foreach ($data_tindakan as $data) {
             $hasil[] = [
-                "waktu"            => $data->tgl_periksa . " " . $data->jam,
-                "no_rawat"         => $item->no_rawat,
-                "mr"               => $item->no_rkm_medis,
-                "nama_pasien"      => $item->nm_pasien,
-                "layanan_asal"     => $item->layanan_asal,
-                "jaminan"          => $item->jaminan,
-                "kd_dpjp"          => $item->kd_dokter,
-                "dpjp"             => $item->nm_dokter,
-                "kode"             => $data->kd_jenis_prw,
-                "keterangan"       => $data->nm_perawatan,
-                "layanan"          => "RADIOLOGI",
-                "dokter_pelaksana" => isset($data->nm_dokter) ? $data->nm_dokter : "",
-                "dokter_operator"  => "",
-                "asisten_operator" => "",
-                "dokter_anestesi"  => "",
-                "asisten_anestesi" => "",
-                "dokter_anak"      => "",
-                "instrumen"        => "",
-                "paramedis"        => isset($data->nama) ? $data->nama : "",
-                "margin_obat"      => "",
-                "total"            => $data->biaya,
+                "waktu"              => $data->tgl_periksa . " " . $data->jam,
+                "no_rawat"           => $item->no_rawat,
+                "mr"                 => $item->no_rkm_medis,
+                "nama_pasien"        => $item->nm_pasien,
+                "layanan_asal"       => $item->layanan_asal,
+                "jaminan"            => $item->jaminan,
+                "registrasi_kd_dpjp" => $item->reg_kd_dokter,
+                "registrasi_dpjp"    => $item->reg_nm_dokter,
+                "kd_dpjp"            => $item->kd_dokter,
+                "dpjp"               => $item->nm_dokter,
+                "kode"               => $data->kd_jenis_prw,
+                "keterangan"         => $data->nm_perawatan,
+                "layanan"            => "RADIOLOGI",
+                // "bangsal"            => "",
+                "ruang_tindakan"     => "",
+                // "kd_bangsal"         => "",
+                "dokter_pelaksana"   => isset($data->nm_dokter) ? $data->nm_dokter : "",
+                "dokter_operator"    => "",
+                "asisten_operator"   => "",
+                "dokter_anestesi"    => "",
+                "asisten_anestesi"   => "",
+                "dokter_anak"        => "",
+                "instrumen"          => "",
+                "paramedis"          => isset($data->nama) ? $data->nama : "",
+                "margin_obat"        => "",
+                "total"              => $data->biaya,
             ];
         }
         return $hasil;
@@ -1413,8 +1561,8 @@ if (! function_exists('get_detil_tindakan_ralan_batch')) {
         $in = implode(',', array_fill(0, count($noRawats), '?'));
         if ($igd) {
             $query = "
-            SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter, NULL as nama_paramedis,
-                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal
+            SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter, NULL as nama_paramedis, NULL as kode_paramedis,
+                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal, NULL as ruang_tindakan
             FROM rawat_jl_dr r
             INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
             INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
@@ -1424,8 +1572,8 @@ if (! function_exists('get_detil_tindakan_ralan_batch')) {
 
             UNION ALL
 
-            SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter, pt.nama as nama_paramedis,
-                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal
+            SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter, pt.nama as nama_paramedis, pt.nip as kode_paramedis,
+                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal, NULL as ruang_tindakan
             FROM rawat_jl_drpr r
             INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
             INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
@@ -1436,8 +1584,8 @@ if (! function_exists('get_detil_tindakan_ralan_batch')) {
 
             UNION ALL
 
-            SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, NULL as nm_dokter, pt.nama as nama_paramedis,
-                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal
+            SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, NULL as nm_dokter, pt.nama as nama_paramedis, pt.nip as kode_paramedis,
+                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal, NULL as ruang_tindakan
             FROM rawat_jl_pr r
             INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
             INNER JOIN petugas pt ON pt.nip = r.nip
@@ -1447,8 +1595,8 @@ if (! function_exists('get_detil_tindakan_ralan_batch')) {
         ";
         } else {
             $query = "
-            SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter, NULL as nama_paramedis,
-                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal
+            SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter, NULL as nama_paramedis, NULL as kode_paramedis,
+                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal, NULL as ruang_tindakan
             FROM rawat_jl_dr r
             INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
             INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
@@ -1458,8 +1606,8 @@ if (! function_exists('get_detil_tindakan_ralan_batch')) {
 
             UNION ALL
 
-            SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter, pt.nama as nama_paramedis,
-                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal
+            SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter, pt.nama as nama_paramedis, pt.nip as kode_paramedis,
+                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal, NULL as ruang_tindakan
             FROM rawat_jl_drpr r
             INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
             INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
@@ -1470,8 +1618,8 @@ if (! function_exists('get_detil_tindakan_ralan_batch')) {
 
             UNION ALL
 
-            SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, NULL as nm_dokter, pt.nama as nama_paramedis,
-                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal
+            SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, NULL as nm_dokter, pt.nama as nama_paramedis, pt.nip as kode_paramedis,
+                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal, NULL as ruang_tindakan
             FROM rawat_jl_pr r
             INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
             INNER JOIN petugas pt ON pt.nip = r.nip
@@ -1491,9 +1639,26 @@ if (! function_exists('get_detil_tindakan_ranap_batch')) {
         $in = implode(',', array_fill(0, count($noRawats), '?'));
 
         $query = "
-            SELECT r.no_rawat, d.nm_dokter, NULL as nama_paramedis,
+            SELECT r.no_rawat, d.nm_dokter, NULL as nama_paramedis,NULL as kode_paramedis,
                    tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
-                   j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal
+                   j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
+
+            -- 💡 Menentukan ruang (bangsal) berdasarkan waktu tindakan
+            (
+                SELECT bangsal.kd_bangsal
+                FROM kamar_inap
+                INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+                INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+                WHERE kamar_inap.no_rawat = r.no_rawat
+                AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+                    BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
+                        AND CONCAT(
+                            IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), '9999-12-31'),
+                            ' ',
+                            IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                        )
+                LIMIT 1
+            ) AS ruang_tindakan
             FROM rawat_inap_dr r
             INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
             INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
@@ -1504,9 +1669,26 @@ if (! function_exists('get_detil_tindakan_ranap_batch')) {
 
             UNION ALL
 
-            SELECT r.no_rawat, d.nm_dokter, pt.nama as nama_paramedis,
+            SELECT r.no_rawat, d.nm_dokter, pt.nama as nama_paramedis,pt.nip as kode_paramedis,
                    tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
-                   j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal
+                   j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
+
+            -- 💡 Menentukan ruang (bangsal) berdasarkan waktu tindakan
+            (
+                SELECT bangsal.kd_bangsal
+                FROM kamar_inap
+                INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+                INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+                WHERE kamar_inap.no_rawat = r.no_rawat
+                AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+                    BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
+                        AND CONCAT(
+                            IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), '9999-12-31'),
+                            ' ',
+                            IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                        )
+                LIMIT 1
+            ) AS ruang_tindakan
             FROM rawat_inap_drpr r
             INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
             INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
@@ -1518,9 +1700,26 @@ if (! function_exists('get_detil_tindakan_ranap_batch')) {
 
             UNION ALL
 
-            SELECT r.no_rawat, NULL as nm_dokter, pt.nama as nama_paramedis,
+            SELECT r.no_rawat, NULL as nm_dokter, pt.nama as nama_paramedis,pt.nip as kode_paramedis,
                    tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
-                   j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal
+                   j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
+
+            -- 💡 Menentukan ruang (bangsal) berdasarkan waktu tindakan
+            (
+                SELECT bangsal.kd_bangsal
+                FROM kamar_inap
+                INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+                INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+                WHERE kamar_inap.no_rawat = r.no_rawat
+                AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+                    BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
+                        AND CONCAT(
+                            IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), '9999-12-31'),
+                            ' ',
+                            IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                        )
+                LIMIT 1
+            ) AS ruang_tindakan
             FROM rawat_inap_pr r
             INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
             INNER JOIN petugas pt ON pt.nip = r.nip
@@ -1552,6 +1751,8 @@ if (! function_exists('get_operasi_detil_batch')) {
                 operasi.tgl_operasi,
                 penjab.png_jawab AS jaminan,
                 poliklinik.nm_poli AS layanan_asal,
+                dokter_reg.kd_dokter AS reg_kd_dokter,
+                dokter_reg.nm_dokter AS reg_nm_dokter,
 
                 -- ambil DPJP dari dpjp_ranap kalau ada, kalau tidak ambil dari reg_periksa
                 COALESCE(dokter_dpjp.kd_dokter, dokter_reg.kd_dokter) AS kd_dpjp,
@@ -1656,27 +1857,32 @@ if (! function_exists('get_operasi_detil_batch')) {
             $nama_asisten_anestesi2 = $data->asisten_anestesi2 == '-' ? "" : ", " . $data->asisten_anestesi2;
 
             $hasil[] = [
-                "waktu"            => $data->tgl_operasi,
-                "no_rawat"         => $data->no_rawat,
-                "mr"               => $data->no_rkm_medis,
-                "nama_pasien"      => $data->nm_pasien,
-                "layanan_asal"     => $data->layanan_asal,
-                "jaminan"          => $data->jaminan,
-                "kd_dpjp"          => $data->kd_dpjp,
-                "dpjp"             => $data->nm_dpjp,
-                "kode"             => $data->kode_paket,
-                "keterangan"       => $data->nm_perawatan,
-                "layanan"          => "OPERASI",
-                "dokter_pelaksana" => "",
-                "dokter_operator"  => $data->operator1 . $nama_operator2 . $nama_operator3,
-                "asisten_operator" => $data->asisten_operator1 . $nama_asisten_operator2 . $nama_asisten_operator3,
-                "dokter_anestesi"  => $data->dokter_anestesi,
-                "asisten_anestesi" => $data->asisten_anestesi . $nama_asisten_anestesi2,
-                "dokter_anak"      => $data->dokter_anak,
-                "instrumen"        => $data->instrumen,
-                "paramedis"        => "",
-                "margin_obat"      => "",
-                "total"            => $data->total_biaya,
+                "waktu"              => $data->tgl_operasi,
+                "no_rawat"           => $data->no_rawat,
+                "mr"                 => $data->no_rkm_medis,
+                "nama_pasien"        => $data->nm_pasien,
+                "layanan_asal"       => $data->layanan_asal,
+                "jaminan"            => $data->jaminan,
+                "registrasi_kd_dpjp" => $data->reg_kd_dokter,
+                "registrasi_dpjp"    => $data->reg_nm_dokter,
+                "kd_dpjp"            => $data->kd_dpjp,
+                "dpjp"               => $data->nm_dpjp,
+                "kode"               => $data->kode_paket,
+                "keterangan"         => $data->nm_perawatan,
+                "layanan"            => "OPERASI",
+                // "bangsal"            => "",
+                "ruang_tindakan"     => "",
+                // "kd_bangsal"         => "",
+                "dokter_pelaksana"   => "",
+                "dokter_operator"    => $data->operator1 . $nama_operator2 . $nama_operator3,
+                "asisten_operator"   => $data->asisten_operator1 . $nama_asisten_operator2 . $nama_asisten_operator3,
+                "dokter_anestesi"    => $data->dokter_anestesi,
+                "asisten_anestesi"   => $data->asisten_anestesi . $nama_asisten_anestesi2,
+                "dokter_anak"        => $data->dokter_anak,
+                "instrumen"          => $data->instrumen,
+                "paramedis"          => "",
+                "margin_obat"        => "",
+                "total"              => $data->total_biaya,
             ];
         }
 
@@ -1723,7 +1929,7 @@ if (! function_exists('get_data_detil_ralan')) {
     }
 }
 if (! function_exists('get_data_detil_unit')) {
-    function get_data_detil_unit($data_tindakan, $item)
+    function get_data_detil_unit($data_tindakan, $item, $is_rawat_jalan = false)
     {
         {
 
@@ -1737,64 +1943,86 @@ if (! function_exists('get_data_detil_unit')) {
             //     'ranap'        => [],
             // ];
             $hasil = [];
-            // dump($data_tindakan);
+            // dump($item);
             foreach ($data_tindakan as $data) {
                 // Normalize string sekali aja biar hemat
                 $nm_perawatan = strtolower((string) $data->nm_perawatan);
                 $kd_bangsal   = strtolower((string) $data->kd_bangsal);
+                $kd_ruang     = strtolower((string) $data->ruang_tindakan);
                 $kd_prw       = strtolower((string) $data->kd_jenis_prw);
                 $nm_pasien    = strtolower(str_replace('.', '', (string) $data->nm_pasien));
 
                 $unit = $kd_bangsal != null ? 'RANAP' : $item->layanan_asal; // default fallback
-
-                if (str_contains($nm_perawatan, 'nicu') || str_contains($nm_perawatan, 'icu')) {
-                    if (str_contains($kd_bangsal, 'nicu')) {
-                        $unit = 'NICU';
-                    } elseif (str_contains($kd_bangsal, 'icu') || str_contains($nm_perawatan, 'icu')) {
-                        $unit = 'ICU';
-                    } else {
-                        // cek nama pasien
-                        if (str_contains($nm_pasien, 'bayi nyonya') || str_contains($nm_pasien, 'by ny')) {
-                            $unit = 'NICU';
-                        } else {
-                            $unit = 'ICU';
-                        }
-                    }
-                } elseif (str_contains($nm_perawatan, 'gizi')) {
+                if (str_contains($nm_perawatan, 'cssd') || str_contains($kd_prw, 'cssd')) {
+                    $unit = 'CSSD';
+                } elseif (str_contains($nm_perawatan, 'gizi') || str_contains($nm_perawatan, 'makan')) {
                     $unit = 'GIZI';
                 } elseif (str_contains($nm_perawatan, 'vk') || str_contains($kd_prw, 'vk')) {
-                    $unit = 'VK';
-                } elseif (str_contains($nm_perawatan, 'cssd') || str_contains($kd_prw, 'cssd')) {
-                    $unit = 'CSSD';
+                    $unit = $is_rawat_jalan ? 'PONEK' : 'VK';
+                } elseif (in_array($data->kode_paramedis, data_petugas_vk_ponek()) || in_array(strtolower($kd_bangsal), array_map('strtolower', data_bangsal_vk()))) {
+                    $unit = $is_rawat_jalan ? 'PONEK' : 'VK';
+                } elseif (str_contains($kd_bangsal, 'nicu') || str_contains($kd_prw, 'nicu')) {
+                    $unit = 'NICU';
+                } elseif (str_contains($kd_bangsal, 'icu') || str_contains($kd_prw, 'icu')) {
+                    $unit = 'ICU';
                     // dd($data);
-                } elseif (str_contains($nm_perawatan, 'rehabilitasi') || str_contains($kd_prw, 'rehabilitasi')) {
-                    $unit = 'REHABILITASI';
+                }
+                // filter bangsal unit untuk tindakan yang dilakukan pada kamar
+                if (in_array(strtolower($kd_bangsal), array_map('strtolower', data_bangsal_vk()))) {
+                    $unit_bangsal = 'VK';
+                } else if (str_contains($kd_bangsal, 'nicu')) {
+                    $unit_bangsal = 'NICU';
+                } else if (str_contains($kd_bangsal, 'icu')) {
+                    $unit_bangsal = 'ICU';
+                } else {
+                    $unit_bangsal = 'RANAP';
+                }
+                // filter bangsal unit untuk tindakan yang dilakukan pada kamar
+                if ($kd_ruang) {
+
+                    if (in_array(strtolower($kd_ruang), array_map('strtolower', data_bangsal_vk()))) {
+                        $ruang_tindakan = 'VK';
+                    } else if (str_contains($kd_ruang, 'nicu')) {
+                        $ruang_tindakan = 'NICU';
+                    } else if (str_contains($kd_ruang, 'icu')) {
+                        $ruang_tindakan = 'ICU';
+                    } else {
+                        $ruang_tindakan = 'RANAP';
+                    }
+                } else {
+                    // dd($kd_ruang, $unit_bangsal);
+                    $ruang_tindakan = $unit_bangsal;
                 }
 
                 // Masukkan data ke unit
                 // $data_unit[$unit][] = $data;
                 $hasil[] = [
-                    "waktu"            => $data->tgl_perawatan . " " . $data->jam_rawat,
-                    "no_rawat"         => $item->no_rawat,
-                    "mr"               => $item->no_rkm_medis,
-                    "nama_pasien"      => $item->nm_pasien,
-                    "layanan_asal"     => $item->layanan_asal,
-                    "jaminan"          => $item->jaminan,
-                    "kd_dpjp"          => $item->kd_dokter,
-                    "dpjp"             => $item->nm_dokter,
-                    "kode"             => $data->kd_jenis_prw,
-                    "keterangan"       => $data->nm_perawatan,
-                    "layanan"          => $unit,
-                    "dokter_pelaksana" => isset($data->nm_dokter) ? $data->nm_dokter : "",
-                    "dokter_operator"  => "",
-                    "asisten_operator" => "",
-                    "dokter_anestesi"  => "",
-                    "asisten_anestesi" => "",
-                    "dokter_anak"      => "",
-                    "instrumen"        => "",
-                    "paramedis"        => isset($data->nama_paramedis) ? $data->nama_paramedis : "",
-                    "margin_obat"      => "",
-                    "total"            => $data->biaya_rawat,
+                    "waktu"              => $data->tgl_perawatan . " " . $data->jam_rawat,
+                    "no_rawat"           => $item->no_rawat,
+                    "mr"                 => $item->no_rkm_medis,
+                    "nama_pasien"        => $item->nm_pasien,
+                    "layanan_asal"       => $item->layanan_asal,
+                    "jaminan"            => $item->jaminan,
+                    "registrasi_kd_dpjp" => $item->reg_kd_dokter,
+                    "registrasi_dpjp"    => $item->reg_nm_dokter,
+                    "kd_dpjp"            => $item->kd_dokter,
+                    "dpjp"               => $item->nm_dokter,
+                    "kode"               => $data->kd_jenis_prw,
+                    "keterangan"         => $data->nm_perawatan,
+                    "layanan"            => $unit,
+                    // "bangsal"            => $unit_bangsal,
+                    "ruang_tindakan"     => $is_rawat_jalan ? '' : $ruang_tindakan,
+                    // "kd_bangsal"         => $is_rawat_jalan ? '' : $kd_ruang,
+                    "dokter_pelaksana"   => isset($data->nm_dokter) ? $data->nm_dokter : "",
+                    "dokter_operator"    => "",
+                    "asisten_operator"   => "",
+                    "dokter_anestesi"    => "",
+                    "asisten_anestesi"   => "",
+                    "dokter_anak"        => "",
+                    "instrumen"          => "",
+                    "paramedis"          => isset($data->nama_paramedis) ? $data->nama_paramedis : "",
+                    "margin_obat"        => "",
+                    "total"              => $data->biaya_rawat,
                 ];
             }
             // dump($hasil);

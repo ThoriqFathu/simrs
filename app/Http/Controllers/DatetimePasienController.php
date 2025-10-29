@@ -16,6 +16,7 @@ class DatetimePasienController extends Controller
             SELECT reg_periksa.tgl_registrasi,
                    reg_periksa.no_rawat,
                    reg_periksa.jam_reg,
+                   reg_periksa.stts,
                    pasien.no_rkm_medis,
                    pasien.nm_pasien,
                    reg_periksa.status_lanjut,

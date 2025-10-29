@@ -38,8 +38,22 @@ class DetilTindakanController extends Controller
                 pasien.nm_pasien,
                 reg_periksa.no_rawat,
                 reg_periksa.no_rkm_medis,
-                COALESCE(dokter_dpjp.kd_dokter, dokter_reg.kd_dokter) AS kd_dokter,
-                COALESCE(dokter_dpjp.nm_dokter, dokter_reg.nm_dokter) AS nm_dokter,
+                dokter_reg.kd_dokter AS reg_kd_dokter,
+                dokter_reg.nm_dokter AS reg_nm_dokter,
+                CASE
+                    WHEN dokter_dpjp.kd_dokter IS NOT NULL
+                        AND dokter_dpjp.kd_dokter <> dokter_reg.kd_dokter
+                    THEN dokter_dpjp.kd_dokter
+                    ELSE dokter_reg.kd_dokter
+                END AS kd_dokter,
+
+                CASE
+                    WHEN dokter_dpjp.kd_dokter IS NOT NULL
+                        AND dokter_dpjp.kd_dokter <> dokter_reg.kd_dokter
+                    THEN dokter_dpjp.nm_dokter
+                    ELSE dokter_reg.nm_dokter
+                END AS nm_dokter,
+
                 penjab.png_jawab AS jaminan,
                 poliklinik.nm_poli AS layanan_asal
             FROM reg_periksa
@@ -190,6 +204,8 @@ class DetilTindakanController extends Controller
                 pasien.nm_pasien,
                 reg_periksa.no_rawat,
                 reg_periksa.no_rkm_medis,
+                reg_periksa.kd_dokter AS reg_kd_dokter,
+                dokter.nm_dokter AS reg_nm_dokter,
                 penjab.png_jawab AS jaminan,
                 poliklinik.nm_poli AS layanan_asal
             FROM reg_periksa
@@ -199,6 +215,8 @@ class DetilTindakanController extends Controller
                 ON reg_periksa.kd_poli = poliklinik.kd_poli
             INNER JOIN pasien
                 ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
+            INNER JOIN dokter
+                ON reg_periksa.kd_dokter = dokter.kd_dokter
             WHERE pasien.no_peserta = ? AND reg_periksa.tgl_registrasi = ?
                 ";
                         $sql_bsep = "
@@ -206,6 +224,8 @@ class DetilTindakanController extends Controller
                 pasien.nm_pasien,
                 reg_periksa.no_rawat,
                 reg_periksa.no_rkm_medis,
+                reg_periksa.kd_dokter AS reg_kd_dokter,
+                dokter.nm_dokter AS reg_nm_dokter,
                 penjab.png_jawab AS jaminan,
                 poliklinik.nm_poli AS layanan_asal
             FROM reg_periksa
@@ -217,6 +237,8 @@ class DetilTindakanController extends Controller
                 ON reg_periksa.kd_poli = poliklinik.kd_poli
             INNER JOIN pasien
                 ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
+            INNER JOIN dokter
+                ON reg_periksa.kd_dokter = dokter.kd_dokter
             WHERE bridging_sep.no_sep = ?
                 ";
                         // === Ambil data rawat dari DB ===
@@ -237,14 +259,16 @@ class DetilTindakanController extends Controller
                             continue;
                         }
 
-                        $row               = new \stdClass();
-                        $row->no_rawat     = $rowData->no_rawat;
-                        $row->no_rkm_medis = $rowData->no_rkm_medis;
-                        $row->nm_pasien    = $rowData->nm_pasien;
-                        $row->layanan_asal = $rowData->layanan_asal;
-                        $row->jaminan      = $rowData->jaminan;
-                        $row->kd_dokter    = $kd_dpjp;
-                        $row->nm_dokter    = $nm_dpjp;
+                        $row                = new \stdClass();
+                        $row->no_rawat      = $rowData->no_rawat;
+                        $row->no_rkm_medis  = $rowData->no_rkm_medis;
+                        $row->nm_pasien     = $rowData->nm_pasien;
+                        $row->layanan_asal  = $rowData->layanan_asal;
+                        $row->jaminan       = $rowData->jaminan;
+                        $row->reg_kd_dokter = $rowData->reg_kd_dokter;
+                        $row->reg_nm_dokter = $rowData->reg_nm_dokter;
+                        $row->kd_dokter     = $kd_dpjp;
+                        $row->nm_dokter     = $nm_dpjp;
 
                         $allKlaim[] = $row;
                     }

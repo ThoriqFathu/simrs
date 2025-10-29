@@ -39,6 +39,7 @@
                         <th class="px-3 py-2 border">Dikirim</th>
                         <th class="px-3 py-2 border">Diterima</th>
                         <th class="px-3 py-2 border">Jam Rawat</th>
+                        <th class="px-3 py-2 border">Status</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -64,6 +65,7 @@
                             <td class="px-3 py-2 border">{{ $row->dikirim }}</td>
                             <td class="px-3 py-2 border">{{ $row->diterima }}</td>
                             <td class="px-3 py-2 border">{{ $row->tgl_perawatan . ' ' . $row->jam_rawat }}</td>
+                            <td class="px-3 py-2 border">{{ $row->stts }}</td>
                         </tr>
                     @empty
                         <tr>

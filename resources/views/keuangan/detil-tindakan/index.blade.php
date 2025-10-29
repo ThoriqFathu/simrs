@@ -20,7 +20,6 @@
                     <option value="1" {{ $jnsPelayanan == 1 ? 'selected' : '' }}>Rawat Inap</option>
                     <option value="2" {{ $jnsPelayanan == 2 ? 'selected' : '' }}>Rawat Jalan</option>
                     <option value="3" {{ $jnsPelayanan == 3 ? 'selected' : '' }}>IGD</option>
-                    <option value="4" {{ $jnsPelayanan == 4 ? 'selected' : '' }}>Semua</option>
                 </select>
             </div>
             <div>
