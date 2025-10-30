@@ -32,6 +32,11 @@
     <li class="hover:bg-indigo-700 py-3 px-4 rounded hover:text-white flex items-center gap-2">
         <img width="20" height="20" src="https://img.icons8.com/material-rounded/100/dashboard-layout.png"
             alt="dashboard" />
+        <a href="{{ route('laporan.kasir') }}" class="font-semibold">Laporan Kasir</a>
+    </li>
+    <li class="hover:bg-indigo-700 py-3 px-4 rounded hover:text-white flex items-center gap-2">
+        <img width="20" height="20" src="https://img.icons8.com/material-rounded/100/dashboard-layout.png"
+            alt="dashboard" />
         <a href="{{ route('monitoring.sinkron_sep.index') }}" class="font-semibold">Sinkron SEP</a>
     </li>
     {{-- <li class="hover:bg-indigo-700 py-3 px-4 rounded hover:text-white flex items-center gap-2">

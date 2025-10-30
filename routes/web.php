@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DatetimePasienController;
 use App\Http\Controllers\DetilTindakanController;
 use App\Http\Controllers\KlaimController;
+use App\Http\Controllers\LaporanKasirController;
 use App\Http\Controllers\ReferensiMjknController;
 use App\Http\Controllers\SinkronSepController;
 use App\Http\Controllers\SirsController;
@@ -68,6 +69,9 @@ Route::get('/detil-tindakan/data', [DetilTindakanController::class, 'loadData'])
     ->name('detil-tindakan.data');
 Route::post('/export-tindakan', [TindakanExportController::class, 'export'])->name('export.tindakan');
 Route::post('/export-tindakan-csv', [TindakanExportController::class, 'exportCsv'])->name('export.tindakan.csv');
+
+Route::get('/laporan/kasir', [LaporanKasirController::class, 'index'])->name('laporan.kasir');
+Route::get('/laporan/kasir/export', [LaporanKasirController::class, 'export'])->name('laporan.kasir.export');
 
 Route::post('/logout', function () {
     session()->forget('is_logged_in');
