@@ -7,6 +7,11 @@
     <li class="hover:bg-indigo-700 py-3 px-4 rounded hover:text-white flex items-center gap-2">
         <img width="20" height="20" src="https://img.icons8.com/material-rounded/100/dashboard-layout.png"
             alt="dashboard" />
+        <a href="{{ route('sql.index') }}" class="font-semibold">SQL Exporter</a>
+    </li>
+    <li class="hover:bg-indigo-700 py-3 px-4 rounded hover:text-white flex items-center gap-2">
+        <img width="20" height="20" src="https://img.icons8.com/material-rounded/100/dashboard-layout.png"
+            alt="dashboard" />
         <a href="{{ route('monitoring.mutasi_berkas.index') }}" class="font-semibold">Mutasi Berkas</a>
     </li>
     <li class="hover:bg-indigo-700 py-3 px-4 rounded hover:text-white flex items-center gap-2">

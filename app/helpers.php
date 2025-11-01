@@ -56,6 +56,55 @@ if (! function_exists('data_bangsal_vk')) {
         return $kode;
     }
 }
+if (! function_exists('get_map_dokter_poli')) {
+    function get_map_dokter_poli($kd_dokter)
+    {
+        $spesialis = [
+            'DR001'    => 'POLI BEDAH',
+            'DR010'    => 'POLI KESEHATAN JIWA',
+            'DR061'    => 'POLI ANAK',
+            'DR006'    => 'POLI KANDUNGAN',
+            'DR007'    => 'POLI KANDUNGAN',
+            'DR045'    => 'Patalogi Klinik',
+            'DR014'    => 'POLI PENYAKIT DALAM',
+            'DR004'    => 'POLI RADIOLOGI',
+            'D0000003' => 'POLI UROLOGI',
+            'DR078'    => 'POLI UROLOGI',
+            'DR003'    => 'POLI UMUM',
+            'DR009'    => 'POLI UMUM',
+            'DR015'    => 'POLI UMUM',
+            'DR018'    => 'POLI UMUM',
+            'DR020'    => 'POLI UMUM',
+            'DR022'    => 'POLI UMUM',
+            'DR031'    => 'POLI UMUM',
+            'DR041'    => 'POLI UMUM',
+            'DR057'    => 'POLI UMUM',
+            'DR058'    => 'POLI UMUM',
+            'DR059'    => 'POLI UMUM',
+            'DR068'    => 'POLI GIGI',
+        ];
+
+        return isset($spesialis[$kd_dokter]) ? $spesialis[$kd_dokter] : false;
+    }
+}
+if (! function_exists('get_map_paramedis_poli')) {
+    function get_map_paramedis_poli($kd_paramedis)
+    {
+        $poli = [
+            'PWT106'      => 'POLI PENYAKIT DALAM',
+            // '20250601006' => 'POLI BEDAH',
+            'PWT144'      => 'POLI RADIOLOGI',
+            '20250601001' => 'POLI RADIOLOGI',
+            'PWT138'      => 'POLI RADIOLOGI',
+            'PWT132'      => 'POLI RADIOLOGI',
+            'PWT130'      => 'POLI ANAK',
+            'PWT086'      => 'POLI ANAK',
+            'PWT119'      => 'POLI KESEHATAN JIWA',
+        ];
+
+        return isset($poli[$kd_paramedis]) ? $poli[$kd_paramedis] : false;
+    }
+}
 
 if (! function_exists('get_name_rs')) {
     function get_name_rs()
@@ -446,10 +495,12 @@ if (! function_exists('get_data_khanza')) {
                 // ============= END GET DPJP ===========
 
                 // dump($select_dpjp);
-                $ralan_paramedis        = get_ralan_paramedis($no_rawat);
-                $ralan_dokter           = get_ralan_dokter($no_rawat);
-                $ralan_dokter_paramedis = get_ralan_dokter_paramedis($no_rawat);
-                $total_ralan            = $ralan_paramedis['total'] + $ralan_dokter + $ralan_dokter_paramedis['total'];
+                // $ralan_paramedis = get_ralan_paramedis($no_rawat);
+                // $ralan_dokter           = get_ralan_dokter($no_rawat);
+                // $ralan_dokter_paramedis = get_ralan_dokter_paramedis($no_rawat);
+                // $total_ralan            = $ralan_paramedis['total'] + $ralan_dokter + $ralan_dokter_paramedis['total'];
+                $data_rujukan           = get_klaim_rujukan_internal_poli($no_rawat);
+                $ralan_batch            = get_ralan_batch($no_rawat);
                 $operasi                = get_operasi($no_rawat);
                 $ranap_paramedis        = get_ranap_paramedis($no_rawat);
                 $ranap_dokter           = get_ranap_dokter($no_rawat);
@@ -469,14 +520,15 @@ if (! function_exists('get_data_khanza')) {
                 $radiologi       = get_radiologi($no_rawat);
                 $lab             = get_lab($no_rawat);
                 $resutls_farmasi = get_farmasi($no_rawat);
-                if ($ralan_dokter_paramedis['is_ponek'] || $ralan_paramedis['is_ponek']) {
-                    $map_poli = get_map_poli('PONEK', $total_ralan);
+                // if ($ralan_dokter_paramedis['is_ponek'] || $ralan_paramedis['is_ponek']) {
+                //     $map_poli = get_map_poli('PONEK', $total_ralan);
 
-                } else {
-                    $map_poli = get_map_poli($select_poli->nm_poli, $total_ralan);
-                }
-                $final = array_replace($data_bpjs, $map_poli);
-                $final = array_replace($final, $data_unit);
+                // } else {
+                //     $map_poli = get_map_poli($select_poli->nm_poli, $total_ralan);
+                // }
+                $map_poli = get_map_poli($ralan_batch, $select_poli->nm_poli, $data_rujukan);
+                $final    = array_replace($data_bpjs, $map_poli);
+                $final    = array_replace($final, $data_unit);
 
                 // dd($data_bpjs);
                 $item = [
@@ -592,26 +644,53 @@ if (! function_exists('get_data_unit')) {
 }
 
 if (! function_exists('get_map_poli')) {
-    function get_map_poli($nm_poli, $total_ralan)
+    function get_map_poli($data_tindakan, $nm_poli_reg, $data_rujukan)
     {
         $polis = [
-            "POLI ANAK"            => 0,
-            "POLI anestesi"        => 0,
-            "POLI BEDAH"           => 0,
-            "POLI PENYAKIT DALAM"  => 0,
-            "POLI GIGI"            => 0,
-            "IGD"                  => 0,
-            "PONEK"                => 0,
-            "POLI KESEHATAN JIWA"  => 0,
-            "POLI NYERI"           => 0,
-            "POLI KANDUNGAN"       => 0,
-            "POLI PATALOGI KLINIK" => 0,
-            "POLI RADIOLOGI"       => 0,
-            "UMUM"                 => 0,
-            "POLI UMUM"            => 0,
-            "POLI UROLOGI"         => 0,
+            "POLI ANAK"           => 0,
+            "POLI BEDAH"          => 0,
+            "POLI PENYAKIT DALAM" => 0,
+            "POLI GIGI"           => 0,
+            "IGD"                 => 0,
+            "PONEK"               => 0,
+            "POLI KESEHATAN JIWA" => 0,
+            "POLI NYERI"          => 0,
+            "POLI KANDUNGAN"      => 0,
+            // "POLI PATALOGI KLINIK" => 0,
+            "POLI RADIOLOGI"      => 0,
+            // "UMUM"                 => 0,
+            "POLI UMUM"           => 0,
+            "POLI UROLOGI"        => 0,
         ];
-        $polis[$nm_poli] = $total_ralan;
+        $unit = $nm_poli_reg;
+        foreach ($data_tindakan as $data) {
+            $poli = get_map_dokter_poli($data->kd_dokter);
+            if ($poli) {
+                $unit = $poli;
+            }
+            if ((! empty($data_rujukan))) {
+
+                if (! $data->kd_dokter) {
+                    // if ($counter_paramedis != 0 && $counter_paramedis <= count($data_rujukan)) {
+                    //     // dump($data_rujukan);
+                    //     $data_poli = $data_rujukan[($counter_paramedis - 1)];
+                    //     $unit      = $data_poli->nm_poli;
+                    //     // dump($data_rujukan);
+                    // }
+                    $paramedis_poli = get_map_paramedis_poli($data->kode_paramedis);
+                    if ($paramedis_poli) {
+                        $unit = $paramedis_poli;
+                    }
+                    // dump($data_rujukan, $data);
+                    // $counter_paramedis += 1;
+                }
+            }
+
+            if (in_array($data->kode_paramedis, data_petugas_vk_ponek())) {
+                $unit = "PONEK";
+            }
+            $polis[$unit] += $data->biaya_rawat;
+        }
 
         return $polis;
     }
@@ -676,6 +755,97 @@ if (! function_exists('get_ralan_dokter_paramedis')) {
             'is_ponek' => $is_ponek,
         ];
         return $result;
+    }
+}
+if (! function_exists('get_ralan_batch')) {
+    function get_ralan_batch($no_rawat)
+    {
+        $query = "
+             SELECT
+            r.no_rawat,
+            j.kd_jenis_prw,
+            COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+            d.nm_dokter,
+            d.kd_dokter,
+            NULL AS nama_paramedis,
+            NULL AS kode_paramedis,
+            tgl_perawatan,
+            jam_rawat,
+            p.nm_pasien,
+            biaya_rawat,
+            NULL AS kd_bangsal,
+            NULL AS ruang_tindakan
+        FROM rawat_jl_dr r
+        INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+        INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
+        LEFT JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
+        INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+        WHERE r.no_rawat = ?
+
+        UNION ALL
+
+        SELECT
+            r.no_rawat,
+            j.kd_jenis_prw,
+            COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+            d.nm_dokter,
+            d.kd_dokter,
+            pt.nama AS nama_paramedis,
+            pt.nip AS kode_paramedis,
+            tgl_perawatan,
+            jam_rawat,
+            p.nm_pasien,
+            biaya_rawat,
+            NULL AS kd_bangsal,
+            NULL AS ruang_tindakan
+        FROM rawat_jl_drpr r
+        INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+        INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
+        INNER JOIN petugas pt ON pt.nip = r.nip
+        LEFT JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
+        INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+        WHERE r.no_rawat = ?
+
+        UNION ALL
+
+        SELECT
+            r.no_rawat,
+            j.kd_jenis_prw,
+            COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+            NULL AS nm_dokter,
+            NULL AS kd_dokter,
+            pt.nama AS nama_paramedis,
+            pt.nip AS kode_paramedis,
+            tgl_perawatan,
+            jam_rawat,
+            p.nm_pasien,
+            biaya_rawat,
+            NULL AS kd_bangsal,
+            NULL AS ruang_tindakan
+        FROM rawat_jl_pr r
+        INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+        INNER JOIN petugas pt ON pt.nip = r.nip
+        LEFT JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
+        INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+        WHERE r.no_rawat = ?;
+        ";
+        $data = DB::select($query, [$no_rawat, $no_rawat, $no_rawat]);
+
+        // $data = DB::selectOne("
+        //     SELECT IFNULL(SUM(rawat_jl_drpr.biaya_rawat),0) AS total_biaya, MAX(rawat_jl_drpr.nip) AS kode_paramedis
+        //     FROM reg_periksa
+        //     INNER JOIN rawat_jl_drpr ON rawat_jl_drpr.no_rawat=reg_periksa.no_rawat
+        //     WHERE reg_periksa.no_rawat = ?
+        // ", [$no_rawat]);
+        // $is_ponek = false;
+        // if (in_array($data->kode_paramedis, data_petugas_vk_ponek())) {
+        //     $is_ponek = true;
+        // }
+        // $result = [
+        //     'total'    => $data->total_biaya,
+        //     'is_ponek' => $is_ponek,
+        // ];
+        return $data;
     }
 }
 
@@ -747,8 +917,8 @@ if (! function_exists('get_ranap_dokter')) {
         ) AS ruang_tindakan
         FROM reg_periksa
         INNER JOIN rawat_inap_dr r ON r.no_rawat=reg_periksa.no_rawat
-        INNER JOIN jns_perawatan_inap ON jns_perawatan_inap.kd_jenis_prw=r.kd_jenis_prw
-        INNER JOIN bangsal ON jns_perawatan_inap.kd_bangsal=bangsal.kd_bangsal
+        LEFT JOIN jns_perawatan_inap ON jns_perawatan_inap.kd_jenis_prw=r.kd_jenis_prw
+        LEFT JOIN bangsal ON jns_perawatan_inap.kd_bangsal=bangsal.kd_bangsal
         INNER JOIN pasien ON pasien.no_rkm_medis=reg_periksa.no_rkm_medis
         WHERE reg_periksa.no_rawat = ?
     ", [$no_rawat]);
@@ -790,8 +960,8 @@ if (! function_exists('get_ranap_paramedis')) {
         ) AS ruang_tindakan
         FROM reg_periksa
         INNER JOIN rawat_inap_pr r ON r.no_rawat=reg_periksa.no_rawat
-        INNER JOIN jns_perawatan_inap ON jns_perawatan_inap.kd_jenis_prw=r.kd_jenis_prw
-        INNER JOIN bangsal ON jns_perawatan_inap.kd_bangsal=bangsal.kd_bangsal
+        LEFT JOIN jns_perawatan_inap ON jns_perawatan_inap.kd_jenis_prw=r.kd_jenis_prw
+        LEFT JOIN bangsal ON jns_perawatan_inap.kd_bangsal=bangsal.kd_bangsal
         INNER JOIN pasien ON pasien.no_rkm_medis=reg_periksa.no_rkm_medis
         WHERE reg_periksa.no_rawat = ?
     ", [$no_rawat]);
@@ -823,8 +993,8 @@ if (! function_exists('get_ranap_dokter_paramedis')) {
         ) AS ruang_tindakan
         FROM reg_periksa
         INNER JOIN rawat_inap_drpr r ON r.no_rawat=reg_periksa.no_rawat
-        INNER JOIN jns_perawatan_inap ON jns_perawatan_inap.kd_jenis_prw=r.kd_jenis_prw
-        INNER JOIN bangsal ON jns_perawatan_inap.kd_bangsal=bangsal.kd_bangsal
+        LEFT JOIN jns_perawatan_inap ON jns_perawatan_inap.kd_jenis_prw=r.kd_jenis_prw
+        LEFT JOIN bangsal ON jns_perawatan_inap.kd_bangsal=bangsal.kd_bangsal
         INNER JOIN pasien ON pasien.no_rkm_medis=reg_periksa.no_rkm_medis
         WHERE reg_periksa.no_rawat = ?
     ", [$no_rawat]);
@@ -1131,6 +1301,8 @@ if (! function_exists('get_data_detil_tindakan')) {
         $data_radiologi = get_radiologi_detil_batch($noRawats);
         $data_lab       = get_lab_detil_batch($noRawats);
         $data_farmasi   = get_farmasi_detil_batch($noRawats);
+        $data_rujukan   = get_rujukan_internal_poli($noRawats);
+        // dump($data_rujukan);
         // Helper untuk group by no_rawat
         $groupByNoRawat = function ($data, $key = 'no_rawat') {
             $grouped = [];
@@ -1141,8 +1313,9 @@ if (! function_exists('get_data_detil_tindakan')) {
             return $grouped;
         };
 
-        $group_rawat = $groupByNoRawat($data_rawat);
-        // dd($group_rawat);
+        $group_rawat   = $groupByNoRawat($data_rawat);
+        $group_rujukan = $groupByNoRawat($data_rujukan);
+        // dump($group_rujukan);
         $group_operasi   = $groupByNoRawat($data_operasi);
         $group_radiologi = $groupByNoRawat($data_radiologi);
         $group_lab       = $groupByNoRawat($data_lab);
@@ -1156,7 +1329,7 @@ if (! function_exists('get_data_detil_tindakan')) {
             $no = $item->no_rawat;
 
             $data = array_merge(
-                get_data_detil_unit($group_rawat[$no] ?? [], $item, $is_rawat_jalan),
+                get_data_detil_unit($group_rawat[$no] ?? [], $item, $is_rawat_jalan, $group_rujukan[$no] ?? []),
                 get_data_radiologi_detil($group_radiologi[$no] ?? [], $item),
                 get_data_lab_detil($group_lab[$no] ?? [], $item),
                 get_data_farmasi_detil($group_farmasi[$no] ?? [], $item),
@@ -1285,91 +1458,92 @@ if (! function_exists('get_farmasi_detil_batch')) {
         //     WHERE dpo.no_rawat IN ($in)
         // ";
         $query = "
-    SELECT
-        ro.no_rawat,
-        ro.tgl_perawatan,
-        ro.jam,
-        ro.kd_dokter,
-        dokter.nm_dokter,
-        dpo.kode_brng,
-        dpo.h_beli,
-        dpo.jml,
-        db.nama_brng,
-        dpo.total,
-        IFNULL(
-            (
-                -- 🩺 Prioritas 1: kamar saat obat diberikan
-                SELECT bangsal.kd_bangsal
-                FROM kamar_inap
-                INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
-                INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
-                WHERE kamar_inap.no_rawat = ro.no_rawat
-                AND CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
-                    BETWEEN CONCAT(
-                        IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
-                        ' ',
-                        IFNULL(kamar_inap.jam_masuk, '00:00:00')
-                    )
-                    AND CONCAT(
-                        IFNULL(NULLIF(CAST(kamar_inap.tgl_keluar AS CHAR), '0000-00-00'), '9999-12-31'),
-                        ' ',
-                        IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
-                    )
-                LIMIT 1
-            ),
-            IFNULL(
-                (
-                    -- 🕓 Prioritas 2: kamar pertama setelah waktu obat
-                    SELECT bangsal.kd_bangsal
-                    FROM kamar_inap
-                    INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
-                    INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
-                    WHERE kamar_inap.no_rawat = ro.no_rawat
-                    AND CONCAT(
-                        IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
-                        ' ',
-                        IFNULL(kamar_inap.jam_masuk, '00:00:00')
-                    ) > CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
-                    ORDER BY CONCAT(
-                        IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
-                        ' ',
-                        IFNULL(kamar_inap.jam_masuk, '00:00:00')
-                    ) ASC
-                    LIMIT 1
-                ),
-                (
-                    -- 🕘 Prioritas 3: kamar terakhir sebelum waktu obat
-                    SELECT bangsal.kd_bangsal
-                    FROM kamar_inap
-                    INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
-                    INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
-                    WHERE kamar_inap.no_rawat = ro.no_rawat
-                    AND CONCAT(
-                        IFNULL(NULLIF(CAST(
-                            IFNULL(kamar_inap.tgl_keluar, kamar_inap.tgl_masuk) AS CHAR
-                        ), '0000-00-00'), '1900-01-01'),
-                        ' ',
-                        IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
-                    ) < CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
-                    ORDER BY CONCAT(
-                        IFNULL(NULLIF(CAST(
-                            IFNULL(kamar_inap.tgl_keluar, kamar_inap.tgl_masuk) AS CHAR
-                        ), '0000-00-00'), '1900-01-01'),
-                        ' ',
-                        IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
-                    ) DESC
-                    LIMIT 1
-                )
-            )
-        ) AS kd_bangsal
-    FROM resep_obat ro
-    INNER JOIN detail_pemberian_obat dpo
-        ON ro.no_rawat = dpo.no_rawat
-        AND ro.tgl_perawatan = dpo.tgl_perawatan
-        AND ro.jam = dpo.jam
-    INNER JOIN databarang db ON dpo.kode_brng = db.kode_brng
-    INNER JOIN dokter ON ro.kd_dokter = dokter.kd_dokter
-    WHERE dpo.no_rawat IN ($in)
+                    SELECT
+                    ro.no_rawat,
+                    ro.tgl_perawatan,
+                    ro.jam,
+                    ro.kd_dokter,
+                    dokter.nm_dokter,
+                    dpo.kode_brng,
+                    dpo.h_beli,
+                    dpo.jml,
+                    COALESCE(db.nama_brng, 'Data tidak ditemukan') AS nama_brng,
+                    dpo.total,
+                    IFNULL(
+                        (
+                            -- 🩺 Prioritas 1: kamar saat obat diberikan
+                            SELECT bangsal.kd_bangsal
+                            FROM kamar_inap
+                            INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+                            INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+                            WHERE kamar_inap.no_rawat = ro.no_rawat
+                            AND CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
+                                BETWEEN CONCAT(
+                                    IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
+                                    ' ',
+                                    IFNULL(kamar_inap.jam_masuk, '00:00:00')
+                                )
+                                AND CONCAT(
+                                    IFNULL(NULLIF(CAST(kamar_inap.tgl_keluar AS CHAR), '0000-00-00'), '9999-12-31'),
+                                    ' ',
+                                    IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                                )
+                            LIMIT 1
+                        ),
+                        IFNULL(
+                            (
+                                -- 🕓 Prioritas 2: kamar pertama setelah waktu obat
+                                SELECT bangsal.kd_bangsal
+                                FROM kamar_inap
+                                INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+                                INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+                                WHERE kamar_inap.no_rawat = ro.no_rawat
+                                AND CONCAT(
+                                    IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
+                                    ' ',
+                                    IFNULL(kamar_inap.jam_masuk, '00:00:00')
+                                ) > CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
+                                ORDER BY CONCAT(
+                                    IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
+                                    ' ',
+                                    IFNULL(kamar_inap.jam_masuk, '00:00:00')
+                                ) ASC
+                                LIMIT 1
+                            ),
+                            (
+                                -- 🕘 Prioritas 3: kamar terakhir sebelum waktu obat
+                                SELECT bangsal.kd_bangsal
+                                FROM kamar_inap
+                                INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+                                INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+                                WHERE kamar_inap.no_rawat = ro.no_rawat
+                                AND CONCAT(
+                                    IFNULL(NULLIF(CAST(
+                                        IFNULL(kamar_inap.tgl_keluar, kamar_inap.tgl_masuk) AS CHAR
+                                    ), '0000-00-00'), '1900-01-01'),
+                                    ' ',
+                                    IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                                ) < CONCAT(ro.tgl_peresepan, ' ', ro.jam_peresepan)
+                                ORDER BY CONCAT(
+                                    IFNULL(NULLIF(CAST(
+                                        IFNULL(kamar_inap.tgl_keluar, kamar_inap.tgl_masuk) AS CHAR
+                                    ), '0000-00-00'), '1900-01-01'),
+                                    ' ',
+                                    IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                                ) DESC
+                                LIMIT 1
+                            )
+                        )
+                    ) AS kd_bangsal
+                FROM resep_obat ro
+                INNER JOIN detail_pemberian_obat dpo
+                    ON ro.no_rawat = dpo.no_rawat
+                AND ro.tgl_perawatan = dpo.tgl_perawatan
+                AND ro.jam = dpo.jam
+                LEFT JOIN databarang db ON dpo.kode_brng = db.kode_brng
+                INNER JOIN dokter ON ro.kd_dokter = dokter.kd_dokter
+                WHERE dpo.no_rawat IN ($in);
+
 ";
 
         return DB::select($query, $noRawats);
@@ -1454,13 +1628,13 @@ if (! function_exists('get_lab_detil_batch')) {
             reg_periksa.no_rkm_medis,
             pasien.nm_pasien,
             periksa_lab.kd_jenis_prw,
-            jns_perawatan_lab.nm_perawatan,
+            COALESCE(jns_perawatan_lab.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
             periksa_lab.kd_dokter,
-            dokter.nm_dokter,
+            COALESCE(dokter.nm_dokter, 'Data tidak ditemukan') AS nm_dokter,
             periksa_lab.nip,
-            petugas.nama,
+            COALESCE(petugas.nama, 'Data tidak ditemukan') AS nama,
             periksa_lab.dokter_perujuk,
-            perujuk.nm_dokter AS perujuk,
+            COALESCE(perujuk.nm_dokter, 'Data tidak ditemukan') AS perujuk,
             periksa_lab.tgl_periksa,
             periksa_lab.jam,
             penjab.png_jawab,
@@ -1474,23 +1648,26 @@ if (! function_exists('get_lab_detil_batch')) {
             periksa_lab.biaya,
             IF(
                 periksa_lab.status = 'Ralan',
-                (SELECT nm_poli FROM poliklinik WHERE poliklinik.kd_poli = reg_periksa.kd_poli),
+                (SELECT nm_poli
+                FROM poliklinik
+                WHERE poliklinik.kd_poli = reg_periksa.kd_poli),
                 (SELECT bangsal.nm_bangsal
-                 FROM kamar_inap
-                 INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
-                 INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
-                 WHERE kamar_inap.no_rawat = periksa_lab.no_rawat
-                 LIMIT 1)
+                FROM kamar_inap
+                INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+                INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+                WHERE kamar_inap.no_rawat = periksa_lab.no_rawat
+                LIMIT 1)
             ) AS ruangan
         FROM periksa_lab
         INNER JOIN reg_periksa ON periksa_lab.no_rawat = reg_periksa.no_rawat
         INNER JOIN pasien ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
-        INNER JOIN dokter ON periksa_lab.kd_dokter = dokter.kd_dokter
-        INNER JOIN dokter AS perujuk ON periksa_lab.dokter_perujuk = perujuk.kd_dokter
-        INNER JOIN petugas ON periksa_lab.nip = petugas.nip
+        LEFT JOIN dokter ON periksa_lab.kd_dokter = dokter.kd_dokter
+        LEFT JOIN dokter AS perujuk ON periksa_lab.dokter_perujuk = perujuk.kd_dokter
+        LEFT JOIN petugas ON periksa_lab.nip = petugas.nip
         INNER JOIN penjab ON reg_periksa.kd_pj = penjab.kd_pj
-        INNER JOIN jns_perawatan_lab ON periksa_lab.kd_jenis_prw = jns_perawatan_lab.kd_jenis_prw
-        WHERE periksa_lab.no_rawat IN ($in)
+        LEFT JOIN jns_perawatan_lab ON periksa_lab.kd_jenis_prw = jns_perawatan_lab.kd_jenis_prw
+        WHERE periksa_lab.no_rawat IN ($in);
+
     ";
 
         return DB::select($query, $noRawats);
@@ -1547,7 +1724,7 @@ if (! function_exists('get_detil_tindakan_rawat_batch')) {
         $in = implode(',', array_fill(0, count($noRawats), '?'));
 
         $query = "
-        SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter, NULL as nama_paramedis,
+        SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter,d.kd_dokter, NULL as nama_paramedis,
                tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal
         FROM rawat_jl_dr r
         INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
@@ -1558,7 +1735,7 @@ if (! function_exists('get_detil_tindakan_rawat_batch')) {
 
         UNION ALL
 
-        SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter, pt.nama as nama_paramedis,
+        SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter,d.kd_dokter, pt.nama as nama_paramedis,
                tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal
         FROM rawat_jl_drpr r
         INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
@@ -1581,7 +1758,7 @@ if (! function_exists('get_detil_tindakan_rawat_batch')) {
 
         UNION ALL
 
-        SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter, NULL as nama_paramedis,
+        SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter,d.kd_dokter, NULL as nama_paramedis,
                tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, b.kd_bangsal
         FROM rawat_inap_dr r
         INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
@@ -1593,7 +1770,7 @@ if (! function_exists('get_detil_tindakan_rawat_batch')) {
 
         UNION ALL
 
-        SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter, pt.nama as nama_paramedis,
+        SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter,d.kd_dokter, pt.nama as nama_paramedis,
                tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, b.kd_bangsal
         FROM rawat_inap_drpr r
         INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
@@ -1631,6 +1808,165 @@ if (! function_exists('get_detil_tindakan_rawat_batch')) {
     }
 
 }
+if (! function_exists('get_klaim_rujukan_internal_poli')) {
+    function get_klaim_rujukan_internal_poli($noRawat)
+    {
+
+        $query = "
+            SELECT
+            rujukan_internal_poli.no_rawat,
+            poliklinik.nm_poli,
+            reg_periksa.kd_dokter AS kd_dokter_reg,
+            reg_periksa.kd_poli AS poli_reg,
+            rujukan_internal_poli.kd_dokter AS kd_dokter_rujukan,
+            rujukan_internal_poli.kd_poli AS poli_rujuk,
+            reg_periksa.kd_pj,
+            reg_periksa.tgl_registrasi,
+            UPPER(
+                CASE DAYOFWEEK(reg_periksa.tgl_registrasi)
+                    WHEN 1 THEN 'MINGGU'
+                    WHEN 2 THEN 'SENIN'
+                    WHEN 3 THEN 'SELASA'
+                    WHEN 4 THEN 'RABU'
+                    WHEN 5 THEN 'KAMIS'
+                    WHEN 6 THEN 'JUMAT'
+                    WHEN 7 THEN 'SABTU'
+                END
+            ) AS hari,
+
+            -- jadwal dokter utama (dari reg_periksa)
+            jadwal_reg.jam_mulai AS jam_mulai_dokter_reg,
+            jadwal_reg.jam_selesai AS jam_selesai_dokter_reg,
+
+            -- jadwal dokter rujukan
+            jadwal_rujuk.jam_mulai AS jam_mulai_dokter_rujuk,
+            jadwal_rujuk.jam_selesai AS jam_selesai_dokter_rujuk
+
+        FROM
+            rujukan_internal_poli
+        INNER JOIN
+            reg_periksa
+                ON rujukan_internal_poli.no_rawat = reg_periksa.no_rawat
+        INNER JOIN poliklinik ON rujukan_internal_poli.kd_poli = poliklinik.kd_poli
+        -- join jadwal dokter utama (dari reg_periksa)
+        LEFT JOIN
+            jadwal AS jadwal_reg
+                ON jadwal_reg.kd_dokter = reg_periksa.kd_dokter
+                AND UPPER(jadwal_reg.hari_kerja) = UPPER(
+                    CASE DAYOFWEEK(reg_periksa.tgl_registrasi)
+                        WHEN 1 THEN 'MINGGU'
+                        WHEN 2 THEN 'SENIN'
+                        WHEN 3 THEN 'SELASA'
+                        WHEN 4 THEN 'RABU'
+                        WHEN 5 THEN 'KAMIS'
+                        WHEN 6 THEN 'JUMAT'
+                        WHEN 7 THEN 'SABTU'
+                    END
+                )
+
+        -- join jadwal dokter rujukan (dari rujukan_internal_poli)
+        LEFT JOIN
+            jadwal AS jadwal_rujuk
+                ON jadwal_rujuk.kd_dokter = rujukan_internal_poli.kd_dokter
+                AND UPPER(jadwal_rujuk.hari_kerja) = UPPER(
+                    CASE DAYOFWEEK(reg_periksa.tgl_registrasi)
+                        WHEN 1 THEN 'MINGGU'
+                        WHEN 2 THEN 'SENIN'
+                        WHEN 3 THEN 'SELASA'
+                        WHEN 4 THEN 'RABU'
+                        WHEN 5 THEN 'KAMIS'
+                        WHEN 6 THEN 'JUMAT'
+                        WHEN 7 THEN 'SABTU'
+                    END
+                )
+
+            WHERE rujukan_internal_poli.no_rawat = ?
+        ";
+
+        return DB::select($query, [$noRawat]);
+
+    }
+}
+if (! function_exists('get_rujukan_internal_poli')) {
+    function get_rujukan_internal_poli($noRawats)
+    {
+        $in = implode(',', array_fill(0, count($noRawats), '?'));
+
+        $query = "
+            SELECT
+            rujukan_internal_poli.no_rawat,
+            poliklinik.nm_poli,
+            reg_periksa.kd_dokter AS kd_dokter_reg,
+            reg_periksa.kd_poli AS poli_reg,
+            rujukan_internal_poli.kd_dokter AS kd_dokter_rujukan,
+            rujukan_internal_poli.kd_poli AS poli_rujuk,
+            reg_periksa.kd_pj,
+            reg_periksa.tgl_registrasi,
+            UPPER(
+                CASE DAYOFWEEK(reg_periksa.tgl_registrasi)
+                    WHEN 1 THEN 'MINGGU'
+                    WHEN 2 THEN 'SENIN'
+                    WHEN 3 THEN 'SELASA'
+                    WHEN 4 THEN 'RABU'
+                    WHEN 5 THEN 'KAMIS'
+                    WHEN 6 THEN 'JUMAT'
+                    WHEN 7 THEN 'SABTU'
+                END
+            ) AS hari,
+
+            -- jadwal dokter utama (dari reg_periksa)
+            jadwal_reg.jam_mulai AS jam_mulai_dokter_reg,
+            jadwal_reg.jam_selesai AS jam_selesai_dokter_reg,
+
+            -- jadwal dokter rujukan
+            jadwal_rujuk.jam_mulai AS jam_mulai_dokter_rujuk,
+            jadwal_rujuk.jam_selesai AS jam_selesai_dokter_rujuk
+
+        FROM
+            rujukan_internal_poli
+        INNER JOIN
+            reg_periksa
+                ON rujukan_internal_poli.no_rawat = reg_periksa.no_rawat
+        INNER JOIN poliklinik ON rujukan_internal_poli.kd_poli = poliklinik.kd_poli
+        -- join jadwal dokter utama (dari reg_periksa)
+        LEFT JOIN
+            jadwal AS jadwal_reg
+                ON jadwal_reg.kd_dokter = reg_periksa.kd_dokter
+                AND UPPER(jadwal_reg.hari_kerja) = UPPER(
+                    CASE DAYOFWEEK(reg_periksa.tgl_registrasi)
+                        WHEN 1 THEN 'MINGGU'
+                        WHEN 2 THEN 'SENIN'
+                        WHEN 3 THEN 'SELASA'
+                        WHEN 4 THEN 'RABU'
+                        WHEN 5 THEN 'KAMIS'
+                        WHEN 6 THEN 'JUMAT'
+                        WHEN 7 THEN 'SABTU'
+                    END
+                )
+
+        -- join jadwal dokter rujukan (dari rujukan_internal_poli)
+        LEFT JOIN
+            jadwal AS jadwal_rujuk
+                ON jadwal_rujuk.kd_dokter = rujukan_internal_poli.kd_dokter
+                AND UPPER(jadwal_rujuk.hari_kerja) = UPPER(
+                    CASE DAYOFWEEK(reg_periksa.tgl_registrasi)
+                        WHEN 1 THEN 'MINGGU'
+                        WHEN 2 THEN 'SENIN'
+                        WHEN 3 THEN 'SELASA'
+                        WHEN 4 THEN 'RABU'
+                        WHEN 5 THEN 'KAMIS'
+                        WHEN 6 THEN 'JUMAT'
+                        WHEN 7 THEN 'SABTU'
+                    END
+                )
+
+            WHERE rujukan_internal_poli.no_rawat IN ($in)
+        ";
+
+        return DB::select($query, $noRawats);
+
+    }
+}
 if (! function_exists('get_radiologi_detil_batch')) {
     function get_radiologi_detil_batch($noRawats)
     {
@@ -1638,43 +1974,44 @@ if (! function_exists('get_radiologi_detil_batch')) {
 
         $query = "
             SELECT
-                periksa_radiologi.no_rawat,
-                reg_periksa.no_rkm_medis,
-                pasien.nm_pasien,
-                periksa_radiologi.kd_jenis_prw,
-                jns_perawatan_radiologi.nm_perawatan,
-                periksa_radiologi.kd_dokter,
-                dokter.nm_dokter,
-                periksa_radiologi.nip,
-                petugas.nama,
-                periksa_radiologi.dokter_perujuk,
-                perujuk.nm_dokter AS perujuk,
-                periksa_radiologi.tgl_periksa,
-                periksa_radiologi.jam,
-                penjab.png_jawab,
-                periksa_radiologi.biaya,
-                IF(
-                    periksa_radiologi.status = 'Ralan',
-                    (SELECT nm_poli
-                    FROM poliklinik
-                    WHERE poliklinik.kd_poli = reg_periksa.kd_poli),
-                    (SELECT bangsal.nm_bangsal
-                    FROM kamar_inap
-                    INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
-                    INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
-                    WHERE kamar_inap.no_rawat = periksa_radiologi.no_rawat
-                    LIMIT 1)
-                ) AS ruangan
-            FROM periksa_radiologi
-            INNER JOIN reg_periksa ON periksa_radiologi.no_rawat = reg_periksa.no_rawat
-            INNER JOIN pasien ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
-            INNER JOIN dokter ON periksa_radiologi.kd_dokter = dokter.kd_dokter
-            INNER JOIN dokter AS perujuk ON periksa_radiologi.dokter_perujuk = perujuk.kd_dokter
-            INNER JOIN petugas ON periksa_radiologi.nip = petugas.nip
-            INNER JOIN penjab ON reg_periksa.kd_pj = penjab.kd_pj
-            INNER JOIN jns_perawatan_radiologi
-                ON periksa_radiologi.kd_jenis_prw = jns_perawatan_radiologi.kd_jenis_prw
-            WHERE periksa_radiologi.no_rawat IN ($in)
+            periksa_radiologi.no_rawat,
+            reg_periksa.no_rkm_medis,
+            pasien.nm_pasien,
+            periksa_radiologi.kd_jenis_prw,
+            COALESCE(jns_perawatan_radiologi.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+            periksa_radiologi.kd_dokter,
+            dokter.nm_dokter,
+            periksa_radiologi.nip,
+            petugas.nama,
+            periksa_radiologi.dokter_perujuk,
+            perujuk.nm_dokter AS perujuk,
+            periksa_radiologi.tgl_periksa,
+            periksa_radiologi.jam,
+            penjab.png_jawab,
+            periksa_radiologi.biaya,
+            IF(
+                periksa_radiologi.status = 'Ralan',
+                (SELECT nm_poli
+                FROM poliklinik
+                WHERE poliklinik.kd_poli = reg_periksa.kd_poli),
+                (SELECT bangsal.nm_bangsal
+                FROM kamar_inap
+                INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+                INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+                WHERE kamar_inap.no_rawat = periksa_radiologi.no_rawat
+                LIMIT 1)
+            ) AS ruangan
+        FROM periksa_radiologi
+        INNER JOIN reg_periksa ON periksa_radiologi.no_rawat = reg_periksa.no_rawat
+        INNER JOIN pasien ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
+        INNER JOIN dokter ON periksa_radiologi.kd_dokter = dokter.kd_dokter
+        INNER JOIN dokter AS perujuk ON periksa_radiologi.dokter_perujuk = perujuk.kd_dokter
+        INNER JOIN petugas ON periksa_radiologi.nip = petugas.nip
+        INNER JOIN penjab ON reg_periksa.kd_pj = penjab.kd_pj
+        LEFT JOIN jns_perawatan_radiologi
+            ON periksa_radiologi.kd_jenis_prw = jns_perawatan_radiologi.kd_jenis_prw
+        WHERE periksa_radiologi.no_rawat IN ($in);
+
         ";
 
         return DB::select($query, $noRawats);
@@ -1724,71 +2061,145 @@ if (! function_exists('get_detil_tindakan_ralan_batch')) {
         $in = implode(',', array_fill(0, count($noRawats), '?'));
         if ($igd) {
             $query = "
-            SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter, NULL as nama_paramedis, NULL as kode_paramedis,
-                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal, NULL as ruang_tindakan
+            SELECT
+                r.no_rawat,
+                j.kd_jenis_prw,
+                COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+                d.nm_dokter,
+                d.kd_dokter,
+                NULL AS nama_paramedis,
+                NULL AS kode_paramedis,
+                tgl_perawatan,
+                jam_rawat,
+                p.nm_pasien,
+                biaya_rawat,
+                NULL AS kd_bangsal,
+                NULL AS ruang_tindakan
             FROM rawat_jl_dr r
             INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
             INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
-            INNER JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
+            LEFT JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
             INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
             WHERE rp.kd_poli = 'IGDK' AND r.no_rawat IN ($in)
 
             UNION ALL
 
-            SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter, pt.nama as nama_paramedis, pt.nip as kode_paramedis,
-                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal, NULL as ruang_tindakan
+            SELECT
+                r.no_rawat,
+                j.kd_jenis_prw,
+                COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+                d.nm_dokter,
+                d.kd_dokter,
+                pt.nama AS nama_paramedis,
+                pt.nip AS kode_paramedis,
+                tgl_perawatan,
+                jam_rawat,
+                p.nm_pasien,
+                biaya_rawat,
+                NULL AS kd_bangsal,
+                NULL AS ruang_tindakan
             FROM rawat_jl_drpr r
             INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
             INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
             INNER JOIN petugas pt ON pt.nip = r.nip
-            INNER JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
+            LEFT JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
             INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
             WHERE rp.kd_poli = 'IGDK' AND r.no_rawat IN ($in)
 
             UNION ALL
 
-            SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, NULL as nm_dokter, pt.nama as nama_paramedis, pt.nip as kode_paramedis,
-                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal, NULL as ruang_tindakan
+            SELECT
+                r.no_rawat,
+                j.kd_jenis_prw,
+                COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+                NULL AS nm_dokter,
+                NULL AS kd_dokter,
+                pt.nama AS nama_paramedis,
+                pt.nip AS kode_paramedis,
+                tgl_perawatan,
+                jam_rawat,
+                p.nm_pasien,
+                biaya_rawat,
+                NULL AS kd_bangsal,
+                NULL AS ruang_tindakan
             FROM rawat_jl_pr r
             INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
             INNER JOIN petugas pt ON pt.nip = r.nip
-            INNER JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
+            LEFT JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
             INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
-            WHERE rp.kd_poli = 'IGDK' AND r.no_rawat IN ($in)
+            WHERE rp.kd_poli = 'IGDK' AND r.no_rawat IN ($in);
+
         ";
         } else {
             $query = "
-            SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter, NULL as nama_paramedis, NULL as kode_paramedis,
-                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal, NULL as ruang_tindakan
-            FROM rawat_jl_dr r
-            INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
-            INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
-            INNER JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
-            INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
-            WHERE r.no_rawat IN ($in)
+            SELECT
+            r.no_rawat,
+            j.kd_jenis_prw,
+            COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+            d.nm_dokter,
+            d.kd_dokter,
+            NULL AS nama_paramedis,
+            NULL AS kode_paramedis,
+            tgl_perawatan,
+            jam_rawat,
+            p.nm_pasien,
+            biaya_rawat,
+            NULL AS kd_bangsal,
+            NULL AS ruang_tindakan
+        FROM rawat_jl_dr r
+        INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+        INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
+        LEFT JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
+        INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+        WHERE r.no_rawat IN ($in)
 
-            UNION ALL
+        UNION ALL
 
-            SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, d.nm_dokter, pt.nama as nama_paramedis, pt.nip as kode_paramedis,
-                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal, NULL as ruang_tindakan
-            FROM rawat_jl_drpr r
-            INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
-            INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
-            INNER JOIN petugas pt ON pt.nip = r.nip
-            INNER JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
-            INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
-            WHERE r.no_rawat IN ($in)
+        SELECT
+            r.no_rawat,
+            j.kd_jenis_prw,
+            COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+            d.nm_dokter,
+            d.kd_dokter,
+            pt.nama AS nama_paramedis,
+            pt.nip AS kode_paramedis,
+            tgl_perawatan,
+            jam_rawat,
+            p.nm_pasien,
+            biaya_rawat,
+            NULL AS kd_bangsal,
+            NULL AS ruang_tindakan
+        FROM rawat_jl_drpr r
+        INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+        INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
+        INNER JOIN petugas pt ON pt.nip = r.nip
+        LEFT JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
+        INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+        WHERE r.no_rawat IN ($in)
 
-            UNION ALL
+        UNION ALL
 
-            SELECT r.no_rawat, j.kd_jenis_prw, j.nm_perawatan, NULL as nm_dokter, pt.nama as nama_paramedis, pt.nip as kode_paramedis,
-                   tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat, NULL as kd_bangsal, NULL as ruang_tindakan
-            FROM rawat_jl_pr r
-            INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
-            INNER JOIN petugas pt ON pt.nip = r.nip
-            INNER JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
-            INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
-            WHERE r.no_rawat IN ($in)
+        SELECT
+            r.no_rawat,
+            j.kd_jenis_prw,
+            COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+            NULL AS nm_dokter,
+            NULL AS kd_dokter,
+            pt.nama AS nama_paramedis,
+            pt.nip AS kode_paramedis,
+            tgl_perawatan,
+            jam_rawat,
+            p.nm_pasien,
+            biaya_rawat,
+            NULL AS kd_bangsal,
+            NULL AS ruang_tindakan
+        FROM rawat_jl_pr r
+        INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+        INNER JOIN petugas pt ON pt.nip = r.nip
+        LEFT JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
+        INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+        WHERE r.no_rawat IN ($in);
+
         ";
         }
 
@@ -1802,7 +2213,7 @@ if (! function_exists('get_detil_tindakan_ranap_batch')) {
         $in = implode(',', array_fill(0, count($noRawats), '?'));
 
         // $query = "
-        //     SELECT r.no_rawat, d.nm_dokter, NULL as nama_paramedis,NULL as kode_paramedis,
+        //     SELECT r.no_rawat, d.nm_dokter,d.kd_dokter, NULL as nama_paramedis,NULL as kode_paramedis,
         //            tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
         //            j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
 
@@ -1832,7 +2243,7 @@ if (! function_exists('get_detil_tindakan_ranap_batch')) {
 
         //     UNION ALL
 
-        //     SELECT r.no_rawat, d.nm_dokter, pt.nama as nama_paramedis,pt.nip as kode_paramedis,
+        //     SELECT r.no_rawat, d.nm_dokter,d.kd_dokter, pt.nama as nama_paramedis,pt.nip as kode_paramedis,
         //            tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
         //            j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
 
@@ -1892,97 +2303,128 @@ if (! function_exists('get_detil_tindakan_ranap_batch')) {
         //     WHERE r.no_rawat IN ($in)
         // ";
         $query = "
-    SELECT r.no_rawat, d.nm_dokter, NULL AS nama_paramedis, NULL AS kode_paramedis,
-        tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
-        j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
+            SELECT
+            r.no_rawat,
+            d.nm_dokter,
+            d.kd_dokter,
+            NULL AS nama_paramedis,
+            NULL AS kode_paramedis,
+            tgl_perawatan,
+            jam_rawat,
+            p.nm_pasien,
+            biaya_rawat,
+            j.kd_jenis_prw,
+            COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+            b.kd_bangsal,
 
-        -- 💡 Menentukan ruang (bangsal) berdasarkan waktu tindakan
-        (
-            SELECT bangsal.kd_bangsal
-            FROM kamar_inap
-            INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
-            INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
-            WHERE kamar_inap.no_rawat = r.no_rawat
-            AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
-                BETWEEN CONCAT(
-                    IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
-                    ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00')
-                )
-                AND CONCAT(
-                    IFNULL(NULLIF(CAST(kamar_inap.tgl_keluar AS CHAR), '0000-00-00'), '9999-12-31'),
-                    ' ', IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
-                )
-            LIMIT 1
-        ) AS ruang_tindakan
-    FROM rawat_inap_dr r
-    INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
-    INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
-    INNER JOIN jns_perawatan_inap j ON j.kd_jenis_prw = r.kd_jenis_prw
-    INNER JOIN bangsal b ON j.kd_bangsal = b.kd_bangsal
-    INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
-    WHERE r.no_rawat IN ($in)
+            -- 💡 Menentukan ruang (bangsal) berdasarkan waktu tindakan
+            (
+                SELECT bangsal.kd_bangsal
+                FROM kamar_inap
+                INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+                INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+                WHERE kamar_inap.no_rawat = r.no_rawat
+                AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+                    BETWEEN CONCAT(
+                        IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
+                        ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00')
+                    )
+                    AND CONCAT(
+                        IFNULL(NULLIF(CAST(kamar_inap.tgl_keluar AS CHAR), '0000-00-00'), '9999-12-31'),
+                        ' ', IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                    )
+                LIMIT 1
+            ) AS ruang_tindakan
+        FROM rawat_inap_dr r
+        INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+        INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
+        LEFT JOIN jns_perawatan_inap j ON j.kd_jenis_prw = r.kd_jenis_prw
+        LEFT JOIN bangsal b ON j.kd_bangsal = b.kd_bangsal
+        INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+        WHERE r.no_rawat IN ($in)
 
-    UNION ALL
+        UNION ALL
 
-    SELECT r.no_rawat, d.nm_dokter, pt.nama AS nama_paramedis, pt.nip AS kode_paramedis,
-        tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
-        j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
-        (
-            SELECT bangsal.kd_bangsal
-            FROM kamar_inap
-            INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
-            INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
-            WHERE kamar_inap.no_rawat = r.no_rawat
-            AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
-                BETWEEN CONCAT(
-                    IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
-                    ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00')
-                )
-                AND CONCAT(
-                    IFNULL(NULLIF(CAST(kamar_inap.tgl_keluar AS CHAR), '0000-00-00'), '9999-12-31'),
-                    ' ', IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
-                )
-            LIMIT 1
-        ) AS ruang_tindakan
-    FROM rawat_inap_drpr r
-    INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
-    INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
-    INNER JOIN petugas pt ON pt.nip = r.nip
-    INNER JOIN jns_perawatan_inap j ON j.kd_jenis_prw = r.kd_jenis_prw
-    INNER JOIN bangsal b ON j.kd_bangsal = b.kd_bangsal
-    INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
-    WHERE r.no_rawat IN ($in)
+        SELECT
+            r.no_rawat,
+            d.nm_dokter,
+            d.kd_dokter,
+            pt.nama AS nama_paramedis,
+            pt.nip AS kode_paramedis,
+            tgl_perawatan,
+            jam_rawat,
+            p.nm_pasien,
+            biaya_rawat,
+            j.kd_jenis_prw,
+            COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+            b.kd_bangsal,
+            (
+                SELECT bangsal.kd_bangsal
+                FROM kamar_inap
+                INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+                INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+                WHERE kamar_inap.no_rawat = r.no_rawat
+                AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+                    BETWEEN CONCAT(
+                        IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
+                        ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00')
+                    )
+                    AND CONCAT(
+                        IFNULL(NULLIF(CAST(kamar_inap.tgl_keluar AS CHAR), '0000-00-00'), '9999-12-31'),
+                        ' ', IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                    )
+                LIMIT 1
+            ) AS ruang_tindakan
+        FROM rawat_inap_drpr r
+        INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+        INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
+        INNER JOIN petugas pt ON pt.nip = r.nip
+        LEFT JOIN jns_perawatan_inap j ON j.kd_jenis_prw = r.kd_jenis_prw
+        LEFT JOIN bangsal b ON j.kd_bangsal = b.kd_bangsal
+        INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+        WHERE r.no_rawat IN ($in)
 
-    UNION ALL
+        UNION ALL
 
-    SELECT r.no_rawat, NULL AS nm_dokter, pt.nama AS nama_paramedis, pt.nip AS kode_paramedis,
-        tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
-        j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
-        (
-            SELECT bangsal.kd_bangsal
-            FROM kamar_inap
-            INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
-            INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
-            WHERE kamar_inap.no_rawat = r.no_rawat
-            AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
-                BETWEEN CONCAT(
-                    IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
-                    ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00')
-                )
-                AND CONCAT(
-                    IFNULL(NULLIF(CAST(kamar_inap.tgl_keluar AS CHAR), '0000-00-00'), '9999-12-31'),
-                    ' ', IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
-                )
-            LIMIT 1
-        ) AS ruang_tindakan
-    FROM rawat_inap_pr r
-    INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
-    INNER JOIN petugas pt ON pt.nip = r.nip
-    INNER JOIN jns_perawatan_inap j ON j.kd_jenis_prw = r.kd_jenis_prw
-    INNER JOIN bangsal b ON j.kd_bangsal = b.kd_bangsal
-    INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
-    WHERE r.no_rawat IN ($in)
-";
+        SELECT
+            r.no_rawat,
+            NULL AS nm_dokter,
+            NULL AS kd_dokter,
+            pt.nama AS nama_paramedis,
+            pt.nip AS kode_paramedis,
+            tgl_perawatan,
+            jam_rawat,
+            p.nm_pasien,
+            biaya_rawat,
+            j.kd_jenis_prw,
+            COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+            b.kd_bangsal,
+            (
+                SELECT bangsal.kd_bangsal
+                FROM kamar_inap
+                INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+                INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+                WHERE kamar_inap.no_rawat = r.no_rawat
+                AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+                    BETWEEN CONCAT(
+                        IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
+                        ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00')
+                    )
+                    AND CONCAT(
+                        IFNULL(NULLIF(CAST(kamar_inap.tgl_keluar AS CHAR), '0000-00-00'), '9999-12-31'),
+                        ' ', IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+                    )
+                LIMIT 1
+            ) AS ruang_tindakan
+        FROM rawat_inap_pr r
+        INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+        INNER JOIN petugas pt ON pt.nip = r.nip
+        LEFT JOIN jns_perawatan_inap j ON j.kd_jenis_prw = r.kd_jenis_prw
+        LEFT JOIN bangsal b ON j.kd_bangsal = b.kd_bangsal
+        INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+        WHERE r.no_rawat IN ($in);
+
+        ";
 
         return DB::select($query, array_merge($noRawats, $noRawats, $noRawats));
     }
@@ -2002,7 +2444,7 @@ if (! function_exists('get_operasi_detil_batch')) {
                 reg_periksa.no_rkm_medis,
                 pasien.nm_pasien,
                 operasi.kode_paket,
-                paket_operasi.nm_perawatan,
+                COALESCE(paket_operasi.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
                 operasi.tgl_operasi,
                 penjab.png_jawab AS jaminan,
                 poliklinik.nm_poli AS layanan_asal,
@@ -2079,7 +2521,7 @@ if (! function_exists('get_operasi_detil_batch')) {
             INNER JOIN reg_periksa ON operasi.no_rawat = reg_periksa.no_rawat
             INNER JOIN poliklinik ON reg_periksa.kd_poli = poliklinik.kd_poli
             INNER JOIN pasien ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
-            INNER JOIN paket_operasi ON operasi.kode_paket = paket_operasi.kode_paket
+            LEFT JOIN paket_operasi ON operasi.kode_paket = paket_operasi.kode_paket
             INNER JOIN penjab ON reg_periksa.kd_pj = penjab.kd_pj
 
             LEFT JOIN dpjp_ranap ON dpjp_ranap.no_rawat = reg_periksa.no_rawat
@@ -2184,7 +2626,7 @@ if (! function_exists('get_data_detil_ralan')) {
     }
 }
 if (! function_exists('get_data_detil_unit')) {
-    function get_data_detil_unit($data_tindakan, $item, $is_rawat_jalan = false)
+    function get_data_detil_unit($data_tindakan, $item, $is_rawat_jalan = false, $data_rujukan)
     {
         {
 
@@ -2198,7 +2640,10 @@ if (! function_exists('get_data_detil_unit')) {
             //     'ranap'        => [],
             // ];
             $hasil = [];
-            // dump($item);
+            // dump("");
+            // dd($data_rujukan);
+            $counter_paramedis = 0;
+            $lastNoRawat       = null;
             foreach ($data_tindakan as $data) {
                 // Normalize string sekali aja biar hemat
                 $nm_perawatan = strtolower((string) $data->nm_perawatan);
@@ -2206,21 +2651,50 @@ if (! function_exists('get_data_detil_unit')) {
                 $kd_ruang     = strtolower((string) $data->ruang_tindakan);
                 $kd_prw       = strtolower((string) $data->kd_jenis_prw);
                 $nm_pasien    = strtolower(str_replace('.', '', (string) $data->nm_pasien));
+                $unit         = $kd_bangsal != null ? 'RANAP' : $item->layanan_asal; // default fallback
 
-                $unit = $kd_bangsal != null ? 'RANAP' : $item->layanan_asal; // default fallback
-                if (str_contains($nm_perawatan, 'cssd') || str_contains($kd_prw, 'cssd')) {
-                    $unit = 'CSSD';
-                } elseif (str_contains($nm_perawatan, 'gizi') || str_contains($nm_perawatan, 'makan')) {
-                    $unit = 'GIZI';
-                } elseif (str_contains($nm_perawatan, 'vk') || str_contains($kd_prw, 'vk')) {
-                    $unit = $is_rawat_jalan ? 'PONEK' : 'VK';
-                } elseif (in_array($data->kode_paramedis, data_petugas_vk_ponek()) || in_array(strtolower($kd_bangsal), array_map('strtolower', data_bangsal_vk()))) {
-                    $unit = $is_rawat_jalan ? 'PONEK' : 'VK';
-                } elseif (str_contains($kd_bangsal, 'nicu') || str_contains($kd_prw, 'nicu')) {
-                    $unit = 'NICU';
-                } elseif (str_contains($kd_bangsal, 'icu') || str_contains($kd_prw, 'icu')) {
-                    $unit = 'ICU';
-                    // dd($data);
+                if ($is_rawat_jalan) {
+                    $poli = get_map_dokter_poli($data->kd_dokter);
+                    if ($poli) {
+                        $unit = $poli;
+                    }
+                    if ((! empty($data_rujukan))) {
+
+                        if (! $data->kd_dokter) {
+                            // if ($counter_paramedis != 0 && $counter_paramedis <= count($data_rujukan)) {
+                            //     // dump($data_rujukan);
+                            //     $data_poli = $data_rujukan[($counter_paramedis - 1)];
+                            //     $unit      = $data_poli->nm_poli;
+                            //     // dump($data_rujukan);
+                            // }
+                            $paramedis_poli = get_map_paramedis_poli($data->kode_paramedis);
+                            if ($paramedis_poli) {
+                                $unit = $paramedis_poli;
+                            }
+                            // dump($data_rujukan, $data);
+                            // $counter_paramedis += 1;
+                        }
+                    }
+                    if (in_array($data->kode_paramedis, data_petugas_vk_ponek())) {
+                        $unit = "PONEK";
+                    }
+
+                } else {
+
+                    if (str_contains($nm_perawatan, 'cssd') || str_contains($kd_prw, 'cssd')) {
+                        $unit = 'CSSD';
+                    } elseif (str_contains($nm_perawatan, 'gizi') || str_contains($nm_perawatan, 'makan')) {
+                        $unit = 'GIZI';
+                    } elseif (str_contains($nm_perawatan, 'vk') || str_contains($kd_prw, 'vk')) {
+                        $unit = $is_rawat_jalan ? 'PONEK' : 'VK';
+                    } elseif (in_array($data->kode_paramedis, data_petugas_vk_ponek()) || in_array(strtolower($kd_bangsal), array_map('strtolower', data_bangsal_vk()))) {
+                        $unit = $is_rawat_jalan ? 'PONEK' : 'VK';
+                    } elseif (str_contains($kd_bangsal, 'nicu') || str_contains($kd_prw, 'nicu')) {
+                        $unit = 'NICU';
+                    } elseif (str_contains($kd_bangsal, 'icu') || str_contains($kd_prw, 'icu')) {
+                        $unit = 'ICU';
+                        // dd($data);
+                    }
                 }
 
                 // filter bangsal unit untuk tindakan yang dilakukan pada kamar
@@ -2231,7 +2705,7 @@ if (! function_exists('get_data_detil_unit')) {
                 } else if (str_contains($kd_bangsal, 'icu')) {
                     $unit_bangsal = 'ICU';
                 } else {
-                    $unit_bangsal = 'RANAP';
+                    $unit_bangsal = $unit;
                 }
                 // filter bangsal unit untuk tindakan yang dilakukan pada kamar
                 if ($kd_ruang) {

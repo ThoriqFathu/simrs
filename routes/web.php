@@ -6,6 +6,7 @@ use App\Http\Controllers\DatetimePasienController;
 use App\Http\Controllers\DetilTindakanController;
 use App\Http\Controllers\KlaimController;
 use App\Http\Controllers\LaporanKasirController;
+use App\Http\Controllers\QuerySqlController;
 use App\Http\Controllers\ReferensiMjknController;
 use App\Http\Controllers\SinkronSepController;
 use App\Http\Controllers\SirsController;
@@ -72,6 +73,9 @@ Route::post('/export-tindakan-csv', [TindakanExportController::class, 'exportCsv
 
 Route::get('/laporan/kasir', [LaporanKasirController::class, 'index'])->name('laporan.kasir');
 Route::get('/laporan/kasir/export', [LaporanKasirController::class, 'export'])->name('laporan.kasir.export');
+
+Route::get('/sql', [QuerySqlController::class, 'index'])->name('sql.index');
+Route::post('/sql/export', [QuerySqlController::class, 'export'])->name('sql.export');
 
 Route::post('/logout', function () {
     session()->forget('is_logged_in');
