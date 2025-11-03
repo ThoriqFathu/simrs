@@ -70,18 +70,18 @@ if (! function_exists('get_map_dokter_poli')) {
             'DR004'    => 'POLI RADIOLOGI',
             'D0000003' => 'POLI UROLOGI',
             'DR078'    => 'POLI UROLOGI',
-            'DR003'    => 'POLI UMUM',
-            'DR009'    => 'POLI UMUM',
-            'DR015'    => 'POLI UMUM',
-            'DR018'    => 'POLI UMUM',
-            'DR020'    => 'POLI UMUM',
-            'DR022'    => 'POLI UMUM',
-            'DR031'    => 'POLI UMUM',
-            'DR041'    => 'POLI UMUM',
-            'DR057'    => 'POLI UMUM',
-            'DR058'    => 'POLI UMUM',
-            'DR059'    => 'POLI UMUM',
-            'DR068'    => 'POLI GIGI',
+            // 'DR003'    => 'POLI UMUM',
+            // 'DR009'    => 'POLI UMUM',
+            // 'DR015'    => 'POLI UMUM',
+            // 'DR018'    => 'POLI UMUM',
+            // 'DR020'    => 'POLI UMUM',
+            // 'DR022'    => 'POLI UMUM',
+            // 'DR031'    => 'POLI UMUM',
+            // 'DR041'    => 'POLI UMUM',
+            // 'DR057'    => 'POLI UMUM',
+            // 'DR058'    => 'POLI UMUM',
+            // 'DR059'    => 'POLI UMUM',
+            // 'DR068'    => 'POLI GIGI',
         ];
 
         return isset($spesialis[$kd_dokter]) ? $spesialis[$kd_dokter] : false;
@@ -1170,17 +1170,17 @@ if (! function_exists('get_tarif_kamar')) {
 }
 
 if (! function_exists('get_data_detil_tindakan')) {
-//     function get_data_detil_tindakan($data_reg, $jns = 1)
+//     function get_data_detil_tindakan($data_range, $jns = 1)
 //     {
 //         // dd($jns);
 //         // if ($jns == 'umum') {
-//         //     $noRawats = collect($data_reg)->pluck('no_rawat')->toArray();
+//         //     $noRawats = collect($data_range)->pluck('no_rawat')->toArray();
 //         // }
-//         $noRawats = collect($data_reg)->pluck('no_rawat')->toArray();
+//         $noRawats = collect($data_range)->pluck('no_rawat')->toArray();
 //         if (empty($noRawats)) {
 //             return [];
 //         }
-//         // dd($data_reg);
+//         // dd($data_range);
 //         // dd($noRawats);
 // // Ambil semua data tindakan dalam 1 batch
 //         if ($jns == 1) {
@@ -1217,7 +1217,7 @@ if (! function_exists('get_data_detil_tindakan')) {
 
 //         $hasil = [];
 
-//         foreach ($data_reg as $item) {
+//         foreach ($data_range as $item) {
 //             $no = $item->no_rawat;
 
 //             $hasil = array_merge(
@@ -1247,63 +1247,26 @@ if (! function_exists('get_data_detil_tindakan')) {
 //         return $hasil;
 
 //     }
-    function get_data_detil_tindakan($data_reg, $jns = 1, $tanggalAwal, $tanggalAkhir, $jaminan, $status_bayar)
+    function get_data_detil_tindakan($data_range, $jns = 1, $tanggalAwal, $tanggalAkhir, $jaminan, $status_bayar)
     {
-        $noRawats = collect($data_reg)->pluck('no_rawat')->toArray();
-        if (empty($noRawats)) {
-            return ['file' => null, 'total' => 0, 'message' => 'Tidak ada data.'];
-        }
-
-        // Buat folder public/json_output (bisa diakses lewat URL)
-        $dir = storage_path('app/public/json_output');
-        if (! file_exists($dir)) {
-            mkdir($dir, 0777, true);
-        }
-        // === 2. Hapus file lama jika lebih dari 4 ===
-        $files = glob($dir . '/tindakan_*.json');
-        if (count($files) >= 3) {
-            // Urutkan berdasarkan waktu modifikasi (terlama dulu)
-            usort($files, function ($a, $b) {
-                return filemtime($a) <=> filemtime($b);
-            });
-
-            // Hapus file paling lama (sisakan 3 yang terbaru)
-            $toDelete = array_slice($files, 0, count($files) - 2);
-            foreach ($toDelete as $f) {
-                @unlink($f);
+        // Helper: buat folder & bersihkan file lama
+        $prepareOutputDir = function ($dir) {
+            if (! file_exists($dir)) {
+                mkdir($dir, 0777, true);
             }
-        }
 
-        // Nama file unik
-        $filename = 'tindakan_' . date('Ymd_His') . '.json';
-        $filepath = $dir . '/' . $filename;
+            $files = glob("$dir/tindakan_*.json");
+            if (count($files) >= 3) {
+                usort($files, fn($a, $b) => filemtime($a) <=> filemtime($b));
+                $toDelete = array_slice($files, 0, count($files) - 2);
+                foreach ($toDelete as $f) {
+                    @unlink($f);
+                }
 
-        // Mulai tulis JSON manual
-        $handle = fopen($filepath, 'w');
-        fwrite($handle, "[\n");
+            }
+        };
 
-        // Ambil semua data batch
-        $is_rawat_jalan = false;
-        if ($jns == 1) {
-            $data_rawat     = get_detil_tindakan_ranap_batch($noRawats);
-            $is_rawat_jalan = false;
-        } elseif ($jns == 2) {
-            $data_rawat     = get_detil_tindakan_ralan_batch($noRawats, false);
-            $is_rawat_jalan = true;
-        } elseif ($jns == 3) {
-            $data_rawat     = get_detil_tindakan_ralan_batch($noRawats, true);
-            $is_rawat_jalan = true;
-        } else {
-            $data_rawat = get_detil_tindakan_rawat_batch($noRawats);
-        }
-
-        $data_operasi   = get_operasi_detil_batch($noRawats);
-        $data_radiologi = get_radiologi_detil_batch($noRawats);
-        $data_lab       = get_lab_detil_batch($noRawats);
-        $data_farmasi   = get_farmasi_detil_batch($noRawats);
-        $data_rujukan   = get_rujukan_internal_poli($noRawats);
-        // dump($data_rujukan);
-        // Helper untuk group by no_rawat
+        // Helper: grupkan berdasarkan no_rawat
         $groupByNoRawat = function ($data, $key = 'no_rawat') {
             $grouped = [];
             foreach ($data as $d) {
@@ -1313,60 +1276,265 @@ if (! function_exists('get_data_detil_tindakan')) {
             return $grouped;
         };
 
-        $group_rawat   = $groupByNoRawat($data_rawat);
-        $group_rujukan = $groupByNoRawat($data_rujukan);
-        // dump($group_rujukan);
-        $group_operasi   = $groupByNoRawat($data_operasi);
-        $group_radiologi = $groupByNoRawat($data_radiologi);
-        $group_lab       = $groupByNoRawat($data_lab);
-        $group_farmasi   = $groupByNoRawat($data_farmasi);
+        // Helper: tulis data JSON streaming agar hemat memori
+        $writeJsonStream = function ($filepath, $dataIterator) {
+            $handle = fopen($filepath, 'w');
+            fwrite($handle, "[\n");
 
-        $first       = true;
-        $lastNoRawat = null;
-        $totalRows   = 0;
+            $first       = true;
+            $lastNoRawat = null;
+            $total       = 0;
 
-        foreach ($data_reg as $item) {
-            $no = $item->no_rawat;
+            foreach ($dataIterator as $rows) {
+                foreach ($rows as &$row) {
+                    if (($row['no_rawat'] ?? '') === $lastNoRawat) {
+                        $row['no_rawat']    = '';
+                        $row['mr']          = '';
+                        $row['nama_pasien'] = '';
+                    } else {
+                        $lastNoRawat = $row['no_rawat'];
+                    }
+                }
+                unset($row);
 
-            $data = array_merge(
-                get_data_detil_unit($group_rawat[$no] ?? [], $item, $is_rawat_jalan, $group_rujukan[$no] ?? []),
-                get_data_radiologi_detil($group_radiologi[$no] ?? [], $item),
-                get_data_lab_detil($group_lab[$no] ?? [], $item),
-                get_data_farmasi_detil($group_farmasi[$no] ?? [], $item),
-                $group_operasi[$no] ?? []
-            );
+                foreach ($rows as $row) {
+                    if (! $first) {
+                        fwrite($handle, ",\n");
+                    }
 
-            foreach ($data as &$row) {
-                if ($row['no_rawat'] === $lastNoRawat) {
-                    $row['no_rawat']    = '';
-                    $row['mr']          = '';
-                    $row['nama_pasien'] = '';
-                } else {
-                    $lastNoRawat = $row['no_rawat'];
+                    fwrite($handle, json_encode($row, JSON_UNESCAPED_UNICODE));
+                    $first = false;
+                    $total++;
                 }
             }
-            unset($row);
 
-            foreach ($data as $row) {
-                if (! $first) {
-                    fwrite($handle, ",\n");
-                }
+            fwrite($handle, "\n]");
+            fclose($handle);
+            return $total;
+        };
 
-                fwrite($handle, json_encode($row, JSON_UNESCAPED_UNICODE));
-                $first = false;
-                $totalRows++;
+        // ========================================
+        // ====== BAGIAN BPJS =====================
+        // ========================================
+        if ($jaminan === 'bpjs') {
+            $noRawats = collect($data_range)->pluck('no_rawat')->toArray();
+            if (empty($noRawats)) {
+                return ['file' => null, 'total' => 0, 'message' => 'Tidak ada data.'];
             }
-            unset($data);
+
+            // Buat folder public/json_output (bisa diakses lewat URL)
+            $dir = storage_path('app/public/json_output');
+            if (! file_exists($dir)) {
+                mkdir($dir, 0777, true);
+            }
+            // === 2. Hapus file lama jika lebih dari 4 ===
+            $files = glob($dir . '/tindakan_*.json');
+            if (count($files) >= 3) {
+                // Urutkan berdasarkan waktu modifikasi (terlama dulu)
+                usort($files, function ($a, $b) {
+                    return filemtime($a) <=> filemtime($b);
+                });
+
+                // Hapus file paling lama (sisakan 3 yang terbaru)
+                $toDelete = array_slice($files, 0, count($files) - 2);
+                foreach ($toDelete as $f) {
+                    @unlink($f);
+                }
+            }
+
+            // Nama file unik
+            $filename = 'tindakan_' . date('Ymd_His') . '.json';
+            $filepath = $dir . '/' . $filename;
+
+            // Mulai tulis JSON manual
+            $handle = fopen($filepath, 'w');
+            fwrite($handle, "[\n");
+
+            // Ambil semua data batch
+            $is_rawat_jalan = false;
+            if ($jns == 1) {
+                $data_rawat     = get_detil_tindakan_ranap_batch($noRawats);
+                $is_rawat_jalan = false;
+            } elseif ($jns == 2) {
+                $data_rawat     = get_detil_tindakan_ralan_batch($noRawats, false);
+                $is_rawat_jalan = true;
+            } elseif ($jns == 3) {
+                $data_rawat     = get_detil_tindakan_ralan_batch($noRawats, true);
+                $is_rawat_jalan = true;
+            } else {
+                $data_rawat = get_detil_tindakan_rawat_batch($noRawats);
+            }
+
+            $data_operasi   = get_operasi_detil_batch($noRawats);
+            $data_radiologi = get_radiologi_detil_batch($noRawats);
+            $data_lab       = get_lab_detil_batch($noRawats);
+            $data_farmasi   = get_farmasi_detil_batch($noRawats);
+            $data_rujukan   = get_rujukan_internal_poli($noRawats);
+            // dump($data_rujukan);
+            // Helper untuk group by no_rawat
+            $groupByNoRawat = function ($data, $key = 'no_rawat') {
+                $grouped = [];
+                foreach ($data as $d) {
+                    $rawat             = is_array($d) ? $d[$key] : $d->$key;
+                    $grouped[$rawat][] = $d;
+                }
+                return $grouped;
+            };
+
+            $group_rawat   = $groupByNoRawat($data_rawat);
+            $group_rujukan = $groupByNoRawat($data_rujukan);
+            // dump($group_rujukan);
+            $group_operasi   = $groupByNoRawat($data_operasi);
+            $group_radiologi = $groupByNoRawat($data_radiologi);
+            $group_lab       = $groupByNoRawat($data_lab);
+            $group_farmasi   = $groupByNoRawat($data_farmasi);
+
+            $first       = true;
+            $lastNoRawat = null;
+            $totalRows   = 0;
+
+            foreach ($data_range as $item) {
+                $no = $item->no_rawat;
+
+                $data = array_merge(
+                    get_data_detil_unit($group_rawat[$no] ?? [], $item, $is_rawat_jalan, $group_rujukan[$no] ?? []),
+                    get_data_radiologi_detil($group_radiologi[$no] ?? [], $item),
+                    get_data_lab_detil($group_lab[$no] ?? [], $item),
+                    get_data_farmasi_detil($group_farmasi[$no] ?? [], $item),
+                    $group_operasi[$no] ?? []
+                );
+
+                foreach ($data as &$row) {
+                    if ($row['no_rawat'] === $lastNoRawat) {
+                        $row['no_rawat']    = '';
+                        $row['mr']          = '';
+                        $row['nama_pasien'] = '';
+                    } else {
+                        $lastNoRawat = $row['no_rawat'];
+                    }
+                }
+                unset($row);
+
+                foreach ($data as $row) {
+                    if (! $first) {
+                        fwrite($handle, ",\n");
+                    }
+
+                    fwrite($handle, json_encode($row, JSON_UNESCAPED_UNICODE));
+                    $first = false;
+                    $totalRows++;
+                }
+                unset($data);
+            }
+
+            fwrite($handle, "\n]");
+            fclose($handle);
         }
 
-        fwrite($handle, "\n]");
-        fclose($handle);
+        // ========================================
+        // ====== BAGIAN NON BPJS ================
+        // ========================================
+        else {
+            $noRawat_inap  = [];
+            $noRawat_jalan = [];
 
-        // URL publik biar bisa diakses dari browser (bukan file:///)
-        $publicUrl = asset('storage/json_output/' . $filename);
+            foreach ($data_range as $t) {
+                $no_nota = $t->no_nota;
+                $x       = DB::selectOne("SELECT no_nota FROM nota_inap WHERE no_rawat = ?", [$no_nota]);
+                if ($x && ! empty($x->no_nota)) {
+                    $noRawat_inap[] = $no_nota;
+                } else {
+                    $x = DB::selectOne("SELECT no_nota FROM nota_jalan WHERE no_rawat = ?", [$no_nota]);
+                    if ($x && ! empty($x->no_nota)) {
+                        $noRawat_jalan[] = $no_nota;
+                    }
+
+                }
+            }
+
+            $noRawat_inap  = $noRawat_inap ?: ['-'];
+            $noRawat_jalan = $noRawat_jalan ?: ['-'];
+            // dump($noRawat_inap);
+            // dump($noRawat_jalan);
+            $makeQuery = function ($status, $placeholders) {
+                return "
+                SELECT
+                    '$status' AS status_rawat,
+                    pasien.nm_pasien,
+                    reg_periksa.no_rawat,
+                    reg_periksa.no_rkm_medis,
+                    dokter_reg.kd_dokter AS reg_kd_dokter,
+                    dokter_reg.nm_dokter AS reg_nm_dokter,
+                    COALESCE(dokter_dpjp.kd_dokter, dokter_reg.kd_dokter) AS kd_dokter,
+                    COALESCE(dokter_dpjp.nm_dokter, dokter_reg.nm_dokter) AS nm_dokter,
+                    penjab.png_jawab AS jaminan,
+                    poliklinik.nm_poli AS layanan_asal
+                FROM reg_periksa
+                INNER JOIN dokter AS dokter_reg ON reg_periksa.kd_dokter = dokter_reg.kd_dokter
+                LEFT JOIN (
+                    SELECT no_rawat, MIN(kd_dokter) AS kd_dokter FROM dpjp_ranap GROUP BY no_rawat
+                ) AS dpjp_pertama ON dpjp_pertama.no_rawat = reg_periksa.no_rawat
+                LEFT JOIN dokter AS dokter_dpjp ON dpjp_pertama.kd_dokter = dokter_dpjp.kd_dokter
+                INNER JOIN penjab ON reg_periksa.kd_pj = penjab.kd_pj
+                INNER JOIN poliklinik ON reg_periksa.kd_poli = poliklinik.kd_poli
+                INNER JOIN pasien ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
+                WHERE reg_periksa.no_rawat IN ($placeholders)
+            ";
+            };
+
+            $placeholders_ranap = implode(',', array_fill(0, count($noRawat_inap), '?'));
+            $placeholders_ralan = implode(',', array_fill(0, count($noRawat_jalan), '?'));
+
+            $data_ranap = DB::select($makeQuery('RANAP', $placeholders_ranap), $noRawat_inap);
+            $data_ralan = DB::select($makeQuery('RALAN', $placeholders_ralan), $noRawat_jalan);
+            $data_final = array_merge($data_ranap, $data_ralan);
+
+            $noRawats = collect($data_final)->pluck('no_rawat')->toArray();
+            if (empty($noRawats)) {
+                return ['file' => null, 'total' => 0, 'message' => 'Tidak ada data.'];
+            }
+
+            $dir = storage_path('app/public/json_output');
+            $prepareOutputDir($dir);
+            $filename = 'tindakan_' . date('Ymd_His') . '.json';
+            $filepath = "$dir/$filename";
+
+            $data_rawat = array_merge(
+                get_detil_tindakan_ranap_batch($noRawats),
+                get_detil_tindakan_ralan_batch($noRawats)
+            );
+
+            $datasets = [
+                'operasi'   => get_operasi_detil_batch($noRawats),
+                'radiologi' => get_radiologi_detil_batch($noRawats),
+                'lab'       => get_lab_detil_batch($noRawats),
+                'farmasi'   => get_farmasi_detil_batch($noRawats),
+                'rujukan'   => get_rujukan_internal_poli($noRawats),
+            ];
+
+            $groups = [];
+            foreach ($datasets as $key => $data) {
+                $groups[$key] = $groupByNoRawat($data);
+            }
+            $groups['rawat'] = $groupByNoRawat($data_rawat);
+
+            $iterator = [];
+            foreach ($data_final as $item) {
+                $no         = $item->no_rawat;
+                $iterator[] = array_merge(
+                    get_data_detil_unit($groups['rawat'][$no] ?? [], $item, false, $groups['rujukan'][$no] ?? []),
+                    get_data_radiologi_detil($groups['radiologi'][$no] ?? [], $item),
+                    get_data_lab_detil($groups['lab'][$no] ?? [], $item),
+                    get_data_farmasi_detil($groups['farmasi'][$no] ?? [], $item),
+                    $groups['operasi'][$no] ?? []
+                );
+            }
+
+            $totalRows = $writeJsonStream($filepath, $iterator);
+        }
 
         return [
-            'file'    => $filepath, // ← URL HTTP valid
+            'file'    => $filepath,
             'total'   => $totalRows,
             'message' => 'Data disimpan ke JSON agar tidak memakan memori besar',
         ];
@@ -2062,6 +2230,7 @@ if (! function_exists('get_detil_tindakan_ralan_batch')) {
         if ($igd) {
             $query = "
             SELECT
+                (SELECT 'RALAN') AS tindakan_rawat,
                 r.no_rawat,
                 j.kd_jenis_prw,
                 COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
@@ -2085,6 +2254,7 @@ if (! function_exists('get_detil_tindakan_ralan_batch')) {
             UNION ALL
 
             SELECT
+                (SELECT 'RALAN') AS tindakan_rawat,
                 r.no_rawat,
                 j.kd_jenis_prw,
                 COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
@@ -2109,6 +2279,7 @@ if (! function_exists('get_detil_tindakan_ralan_batch')) {
             UNION ALL
 
             SELECT
+                (SELECT 'RALAN') AS tindakan_rawat,
                 r.no_rawat,
                 j.kd_jenis_prw,
                 COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
@@ -2133,7 +2304,8 @@ if (! function_exists('get_detil_tindakan_ralan_batch')) {
         } else {
             $query = "
             SELECT
-            r.no_rawat,
+            (SELECT 'RALAN') AS tindakan_rawat,
+                r.no_rawat,
             j.kd_jenis_prw,
             COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
             d.nm_dokter,
@@ -2156,6 +2328,7 @@ if (! function_exists('get_detil_tindakan_ralan_batch')) {
         UNION ALL
 
         SELECT
+            (SELECT 'RALAN') AS tindakan_rawat,
             r.no_rawat,
             j.kd_jenis_prw,
             COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
@@ -2180,6 +2353,7 @@ if (! function_exists('get_detil_tindakan_ralan_batch')) {
         UNION ALL
 
         SELECT
+            (SELECT 'RALAN') AS tindakan_rawat,
             r.no_rawat,
             j.kd_jenis_prw,
             COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
@@ -2207,6 +2381,158 @@ if (! function_exists('get_detil_tindakan_ralan_batch')) {
 
     }
 }
+// if (! function_exists('get_detil_tindakan_ralan_batch')) {
+//     function get_detil_tindakan_ralan_batch($noRawats, $igd = false)
+//     {
+//         $in = implode(',', array_fill(0, count($noRawats), '?'));
+//         if ($igd) {
+//             $query = "
+//             SELECT
+//                 r.no_rawat,
+//                 j.kd_jenis_prw,
+//                 COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+//                 d.nm_dokter,
+//                 d.kd_dokter,
+//                 NULL AS nama_paramedis,
+//                 NULL AS kode_paramedis,
+//                 tgl_perawatan,
+//                 jam_rawat,
+//                 p.nm_pasien,
+//                 biaya_rawat,
+//                 NULL AS kd_bangsal,
+//                 NULL AS ruang_tindakan
+//             FROM rawat_jl_dr r
+//             INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+//             INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
+//             LEFT JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
+//             INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+//             WHERE rp.kd_poli = 'IGDK' AND r.no_rawat IN ($in)
+
+//             UNION ALL
+
+//             SELECT
+//                 r.no_rawat,
+//                 j.kd_jenis_prw,
+//                 COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+//                 d.nm_dokter,
+//                 d.kd_dokter,
+//                 pt.nama AS nama_paramedis,
+//                 pt.nip AS kode_paramedis,
+//                 tgl_perawatan,
+//                 jam_rawat,
+//                 p.nm_pasien,
+//                 biaya_rawat,
+//                 NULL AS kd_bangsal,
+//                 NULL AS ruang_tindakan
+//             FROM rawat_jl_drpr r
+//             INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+//             INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
+//             INNER JOIN petugas pt ON pt.nip = r.nip
+//             LEFT JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
+//             INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+//             WHERE rp.kd_poli = 'IGDK' AND r.no_rawat IN ($in)
+
+//             UNION ALL
+
+//             SELECT
+//                 r.no_rawat,
+//                 j.kd_jenis_prw,
+//                 COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+//                 NULL AS nm_dokter,
+//                 NULL AS kd_dokter,
+//                 pt.nama AS nama_paramedis,
+//                 pt.nip AS kode_paramedis,
+//                 tgl_perawatan,
+//                 jam_rawat,
+//                 p.nm_pasien,
+//                 biaya_rawat,
+//                 NULL AS kd_bangsal,
+//                 NULL AS ruang_tindakan
+//             FROM rawat_jl_pr r
+//             INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+//             INNER JOIN petugas pt ON pt.nip = r.nip
+//             LEFT JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
+//             INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+//             WHERE rp.kd_poli = 'IGDK' AND r.no_rawat IN ($in);
+
+//         ";
+//         } else {
+//             $query = "
+//             SELECT
+//             r.no_rawat,
+//             j.kd_jenis_prw,
+//             COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+//             d.nm_dokter,
+//             d.kd_dokter,
+//             NULL AS nama_paramedis,
+//             NULL AS kode_paramedis,
+//             tgl_perawatan,
+//             jam_rawat,
+//             p.nm_pasien,
+//             biaya_rawat,
+//             NULL AS kd_bangsal,
+//             NULL AS ruang_tindakan
+//         FROM rawat_jl_dr r
+//         INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+//         INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
+//         LEFT JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
+//         INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+//         WHERE r.no_rawat IN ($in)
+
+//         UNION ALL
+
+//         SELECT
+//             r.no_rawat,
+//             j.kd_jenis_prw,
+//             COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+//             d.nm_dokter,
+//             d.kd_dokter,
+//             pt.nama AS nama_paramedis,
+//             pt.nip AS kode_paramedis,
+//             tgl_perawatan,
+//             jam_rawat,
+//             p.nm_pasien,
+//             biaya_rawat,
+//             NULL AS kd_bangsal,
+//             NULL AS ruang_tindakan
+//         FROM rawat_jl_drpr r
+//         INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+//         INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
+//         INNER JOIN petugas pt ON pt.nip = r.nip
+//         LEFT JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
+//         INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+//         WHERE r.no_rawat IN ($in)
+
+//         UNION ALL
+
+//         SELECT
+//             r.no_rawat,
+//             j.kd_jenis_prw,
+//             COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+//             NULL AS nm_dokter,
+//             NULL AS kd_dokter,
+//             pt.nama AS nama_paramedis,
+//             pt.nip AS kode_paramedis,
+//             tgl_perawatan,
+//             jam_rawat,
+//             p.nm_pasien,
+//             biaya_rawat,
+//             NULL AS kd_bangsal,
+//             NULL AS ruang_tindakan
+//         FROM rawat_jl_pr r
+//         INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+//         INNER JOIN petugas pt ON pt.nip = r.nip
+//         LEFT JOIN jns_perawatan j ON j.kd_jenis_prw = r.kd_jenis_prw
+//         INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+//         WHERE r.no_rawat IN ($in);
+
+//         ";
+//         }
+
+//         return DB::select($query, array_merge($noRawats, $noRawats, $noRawats));
+
+//     }
+// }
 if (! function_exists('get_detil_tindakan_ranap_batch')) {
     function get_detil_tindakan_ranap_batch($noRawats)
     {
@@ -2304,6 +2630,7 @@ if (! function_exists('get_detil_tindakan_ranap_batch')) {
         // ";
         $query = "
             SELECT
+            (SELECT 'RANAP') AS tindakan_rawat,
             r.no_rawat,
             d.nm_dokter,
             d.kd_dokter,
@@ -2346,6 +2673,7 @@ if (! function_exists('get_detil_tindakan_ranap_batch')) {
         UNION ALL
 
         SELECT
+            (SELECT 'RANAP') AS tindakan_rawat,
             r.no_rawat,
             d.nm_dokter,
             d.kd_dokter,
@@ -2387,6 +2715,7 @@ if (! function_exists('get_detil_tindakan_ranap_batch')) {
         UNION ALL
 
         SELECT
+            (SELECT 'RANAP') AS tindakan_rawat,
             r.no_rawat,
             NULL AS nm_dokter,
             NULL AS kd_dokter,
@@ -2429,6 +2758,228 @@ if (! function_exists('get_detil_tindakan_ranap_batch')) {
         return DB::select($query, array_merge($noRawats, $noRawats, $noRawats));
     }
 }
+// if (! function_exists('get_detil_tindakan_ranap_batch')) {
+//     function get_detil_tindakan_ranap_batch($noRawats)
+//     {
+//         $in = implode(',', array_fill(0, count($noRawats), '?'));
+
+//         // $query = "
+//         //     SELECT r.no_rawat, d.nm_dokter,d.kd_dokter, NULL as nama_paramedis,NULL as kode_paramedis,
+//         //            tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
+//         //            j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
+
+//         //     -- 💡 Menentukan ruang (bangsal) berdasarkan waktu tindakan
+//         //     (
+//         //         SELECT bangsal.kd_bangsal
+//         //         FROM kamar_inap
+//         //         INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+//         //         INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+//         //         WHERE kamar_inap.no_rawat = r.no_rawat
+//         //         AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+//         //             BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
+//         //                 AND CONCAT(
+//         //                     IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), '9999-12-31'),
+//         //                     ' ',
+//         //                     IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+//         //                 )
+//         //         LIMIT 1
+//         //     ) AS ruang_tindakan
+//         //     FROM rawat_inap_dr r
+//         //     INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+//         //     INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
+//         //     INNER JOIN jns_perawatan_inap j ON j.kd_jenis_prw = r.kd_jenis_prw
+//         //     INNER JOIN bangsal b ON j.kd_bangsal = b.kd_bangsal
+//         //     INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+//         //     WHERE r.no_rawat IN ($in)
+
+//         //     UNION ALL
+
+//         //     SELECT r.no_rawat, d.nm_dokter,d.kd_dokter, pt.nama as nama_paramedis,pt.nip as kode_paramedis,
+//         //            tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
+//         //            j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
+
+//         //     -- 💡 Menentukan ruang (bangsal) berdasarkan waktu tindakan
+//         //     (
+//         //         SELECT bangsal.kd_bangsal
+//         //         FROM kamar_inap
+//         //         INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+//         //         INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+//         //         WHERE kamar_inap.no_rawat = r.no_rawat
+//         //         AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+//         //             BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
+//         //                 AND CONCAT(
+//         //                     IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), '9999-12-31'),
+//         //                     ' ',
+//         //                     IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+//         //                 )
+//         //         LIMIT 1
+//         //     ) AS ruang_tindakan
+//         //     FROM rawat_inap_drpr r
+//         //     INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+//         //     INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
+//         //     INNER JOIN petugas pt ON pt.nip = r.nip
+//         //     INNER JOIN jns_perawatan_inap j ON j.kd_jenis_prw = r.kd_jenis_prw
+//         //     INNER JOIN bangsal b ON j.kd_bangsal = b.kd_bangsal
+//         //     INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+//         //     WHERE r.no_rawat IN ($in)
+
+//         //     UNION ALL
+
+//         //     SELECT r.no_rawat, NULL as nm_dokter, pt.nama as nama_paramedis,pt.nip as kode_paramedis,
+//         //            tgl_perawatan, jam_rawat, p.nm_pasien, biaya_rawat,
+//         //            j.kd_jenis_prw, j.nm_perawatan, b.kd_bangsal,
+
+//         //     -- 💡 Menentukan ruang (bangsal) berdasarkan waktu tindakan
+//         //     (
+//         //         SELECT bangsal.kd_bangsal
+//         //         FROM kamar_inap
+//         //         INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+//         //         INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+//         //         WHERE kamar_inap.no_rawat = r.no_rawat
+//         //         AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+//         //             BETWEEN CONCAT(kamar_inap.tgl_masuk, ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00'))
+//         //                 AND CONCAT(
+//         //                     IFNULL(NULLIF(kamar_inap.tgl_keluar, '0000-00-00'), '9999-12-31'),
+//         //                     ' ',
+//         //                     IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+//         //                 )
+//         //         LIMIT 1
+//         //     ) AS ruang_tindakan
+//         //     FROM rawat_inap_pr r
+//         //     INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+//         //     INNER JOIN petugas pt ON pt.nip = r.nip
+//         //     INNER JOIN jns_perawatan_inap j ON j.kd_jenis_prw = r.kd_jenis_prw
+//         //     INNER JOIN bangsal b ON j.kd_bangsal = b.kd_bangsal
+//         //     INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+//         //     WHERE r.no_rawat IN ($in)
+//         // ";
+//         $query = "
+//             SELECT
+//             r.no_rawat,
+//             d.nm_dokter,
+//             d.kd_dokter,
+//             NULL AS nama_paramedis,
+//             NULL AS kode_paramedis,
+//             tgl_perawatan,
+//             jam_rawat,
+//             p.nm_pasien,
+//             biaya_rawat,
+//             j.kd_jenis_prw,
+//             COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+//             b.kd_bangsal,
+
+//             -- 💡 Menentukan ruang (bangsal) berdasarkan waktu tindakan
+//             (
+//                 SELECT bangsal.kd_bangsal
+//                 FROM kamar_inap
+//                 INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+//                 INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+//                 WHERE kamar_inap.no_rawat = r.no_rawat
+//                 AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+//                     BETWEEN CONCAT(
+//                         IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
+//                         ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00')
+//                     )
+//                     AND CONCAT(
+//                         IFNULL(NULLIF(CAST(kamar_inap.tgl_keluar AS CHAR), '0000-00-00'), '9999-12-31'),
+//                         ' ', IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+//                     )
+//                 LIMIT 1
+//             ) AS ruang_tindakan
+//         FROM rawat_inap_dr r
+//         INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+//         INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
+//         LEFT JOIN jns_perawatan_inap j ON j.kd_jenis_prw = r.kd_jenis_prw
+//         LEFT JOIN bangsal b ON j.kd_bangsal = b.kd_bangsal
+//         INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+//         WHERE r.no_rawat IN ($in)
+
+//         UNION ALL
+
+//         SELECT
+//             r.no_rawat,
+//             d.nm_dokter,
+//             d.kd_dokter,
+//             pt.nama AS nama_paramedis,
+//             pt.nip AS kode_paramedis,
+//             tgl_perawatan,
+//             jam_rawat,
+//             p.nm_pasien,
+//             biaya_rawat,
+//             j.kd_jenis_prw,
+//             COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+//             b.kd_bangsal,
+//             (
+//                 SELECT bangsal.kd_bangsal
+//                 FROM kamar_inap
+//                 INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+//                 INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+//                 WHERE kamar_inap.no_rawat = r.no_rawat
+//                 AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+//                     BETWEEN CONCAT(
+//                         IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
+//                         ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00')
+//                     )
+//                     AND CONCAT(
+//                         IFNULL(NULLIF(CAST(kamar_inap.tgl_keluar AS CHAR), '0000-00-00'), '9999-12-31'),
+//                         ' ', IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+//                     )
+//                 LIMIT 1
+//             ) AS ruang_tindakan
+//         FROM rawat_inap_drpr r
+//         INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+//         INNER JOIN dokter d ON d.kd_dokter = r.kd_dokter
+//         INNER JOIN petugas pt ON pt.nip = r.nip
+//         LEFT JOIN jns_perawatan_inap j ON j.kd_jenis_prw = r.kd_jenis_prw
+//         LEFT JOIN bangsal b ON j.kd_bangsal = b.kd_bangsal
+//         INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+//         WHERE r.no_rawat IN ($in)
+
+//         UNION ALL
+
+//         SELECT
+//             r.no_rawat,
+//             NULL AS nm_dokter,
+//             NULL AS kd_dokter,
+//             pt.nama AS nama_paramedis,
+//             pt.nip AS kode_paramedis,
+//             tgl_perawatan,
+//             jam_rawat,
+//             p.nm_pasien,
+//             biaya_rawat,
+//             j.kd_jenis_prw,
+//             COALESCE(j.nm_perawatan, 'Data tidak ditemukan') AS nm_perawatan,
+//             b.kd_bangsal,
+//             (
+//                 SELECT bangsal.kd_bangsal
+//                 FROM kamar_inap
+//                 INNER JOIN kamar ON kamar_inap.kd_kamar = kamar.kd_kamar
+//                 INNER JOIN bangsal ON kamar.kd_bangsal = bangsal.kd_bangsal
+//                 WHERE kamar_inap.no_rawat = r.no_rawat
+//                 AND CONCAT(r.tgl_perawatan, ' ', r.jam_rawat)
+//                     BETWEEN CONCAT(
+//                         IFNULL(NULLIF(CAST(kamar_inap.tgl_masuk AS CHAR), '0000-00-00'), '1900-01-01'),
+//                         ' ', IFNULL(kamar_inap.jam_masuk, '00:00:00')
+//                     )
+//                     AND CONCAT(
+//                         IFNULL(NULLIF(CAST(kamar_inap.tgl_keluar AS CHAR), '0000-00-00'), '9999-12-31'),
+//                         ' ', IFNULL(NULLIF(kamar_inap.jam_keluar, '00:00:00'), '23:59:59')
+//                     )
+//                 LIMIT 1
+//             ) AS ruang_tindakan
+//         FROM rawat_inap_pr r
+//         INNER JOIN reg_periksa rp ON rp.no_rawat = r.no_rawat
+//         INNER JOIN petugas pt ON pt.nip = r.nip
+//         LEFT JOIN jns_perawatan_inap j ON j.kd_jenis_prw = r.kd_jenis_prw
+//         LEFT JOIN bangsal b ON j.kd_bangsal = b.kd_bangsal
+//         INNER JOIN pasien p ON p.no_rkm_medis = rp.no_rkm_medis
+//         WHERE r.no_rawat IN ($in);
+
+//         ";
+
+//         return DB::select($query, array_merge($noRawats, $noRawats, $noRawats));
+//     }
+// }
 if (! function_exists('get_operasi_detil_batch')) {
     function get_operasi_detil_batch(array $noRawats)
     {
@@ -2644,6 +3195,7 @@ if (! function_exists('get_data_detil_unit')) {
             // dd($data_rujukan);
             $counter_paramedis = 0;
             $lastNoRawat       = null;
+
             foreach ($data_tindakan as $data) {
                 // Normalize string sekali aja biar hemat
                 $nm_perawatan = strtolower((string) $data->nm_perawatan);
@@ -2652,7 +3204,13 @@ if (! function_exists('get_data_detil_unit')) {
                 $kd_prw       = strtolower((string) $data->kd_jenis_prw);
                 $nm_pasien    = strtolower(str_replace('.', '', (string) $data->nm_pasien));
                 $unit         = $kd_bangsal != null ? 'RANAP' : $item->layanan_asal; // default fallback
-
+                if (property_exists($data, 'tindakan_rawat')) {
+                    if ($data->tindakan_rawat == 'RALAN') {
+                        $is_rawat_jalan = true;
+                    } else {
+                        $is_rawat_jalan = false;
+                    }
+                }
                 if ($is_rawat_jalan) {
                     $poli = get_map_dokter_poli($data->kd_dokter);
                     if ($poli) {

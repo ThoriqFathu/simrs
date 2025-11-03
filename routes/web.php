@@ -59,6 +59,15 @@ Route::prefix('jaspel')->name('jaspel.')->middleware('auth.session')->group(func
     });
 
 });
+Route::prefix('laporan')->name('laporan.')->middleware('auth.session')->group(function () {
+
+    Route::prefix('kasir')->name('kasir.')->group(function () {
+        Route::get('/', [LaporanKasirController::class, 'index'])->name('index');
+        Route::get('/export', [LaporanKasirController::class, 'export'])->name('export');
+    });
+
+});
+
 Route::prefix('sirs')->name('sirs.')->middleware('auth.session')->group(function () {
 
     Route::prefix('kamar')->name('kamar.')->group(function () {
@@ -70,9 +79,6 @@ Route::get('/detil-tindakan/data', [DetilTindakanController::class, 'loadData'])
     ->name('detil-tindakan.data');
 Route::post('/export-tindakan', [TindakanExportController::class, 'export'])->name('export.tindakan');
 Route::post('/export-tindakan-csv', [TindakanExportController::class, 'exportCsv'])->name('export.tindakan.csv');
-
-Route::get('/laporan/kasir', [LaporanKasirController::class, 'index'])->name('laporan.kasir');
-Route::get('/laporan/kasir/export', [LaporanKasirController::class, 'export'])->name('laporan.kasir.export');
 
 Route::get('/sql', [QuerySqlController::class, 'index'])->name('sql.index');
 Route::post('/sql/export', [QuerySqlController::class, 'export'])->name('sql.export');

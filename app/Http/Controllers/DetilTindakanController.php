@@ -303,8 +303,16 @@ class DetilTindakanController extends Controller
             }
 
         } else {
-            $data = DB::select($sql, $params);
-
+            $start = $tanggalAwal . ' 00:00:00';
+            $end   = $tanggalAkhir . ' 23:59:59';
+            $data  = DB::select("
+                SELECT no_nota, tgl_bayar, nama_pasien, jumlah_bayar, petugas.nama as nama_petugas
+                FROM tagihan_sadewa
+                INNER JOIN petugas ON tagihan_sadewa.petugas = petugas.nip
+                WHERE tgl_bayar BETWEEN ? AND ?
+                ORDER BY tgl_bayar, no_nota
+            ", [$start, $end]);
+            // $data = DB::select($sql, $params);
             $get_detil = get_data_detil_tindakan($data, $jnsPelayanan, $tanggalAwal, $tanggalAkhir, $jaminan, $status_bayar);
         }
 

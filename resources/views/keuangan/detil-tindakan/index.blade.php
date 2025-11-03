@@ -14,31 +14,38 @@
                 <label class="block mb-1 text-sm font-medium">Tanggal Akhir</label>
                 <input type="date" name="tanggal_akhir" class="w-full border rounded p-2" value="{{ $tanggalAkhir }}">
             </div>
+            {{-- Jaminan --}}
             <div>
+                <label class="block mb-1 text-sm font-medium">Jaminan</label>
+                <select name="jaminan" id="jaminan" class="w-full border rounded p-2">
+                    <option value="umum" {{ $jaminan == 'umum' ? 'selected' : '' }}>Umum</option>
+                    <option value="bpjs" {{ $jaminan == 'bpjs' ? 'selected' : '' }}>BPJS</option>
+                    {{-- <option value="lainnya" {{ $jaminan == 'lainnya' ? 'selected' : '' }}>Lainnya</option> --}}
+                </select>
+            </div>
+
+            {{-- Jenis Pelayanan --}}
+            <div id="jenisPelayananWrapper">
                 <label class="block mb-1 text-sm font-medium">Jenis Pelayanan</label>
-                <select name="jns" class="w-full border rounded p-2">
+                <select name="jns" id="jenisPelayanan" class="w-full border rounded p-2">
                     <option value="1" {{ $jnsPelayanan == 1 ? 'selected' : '' }}>Rawat Inap</option>
                     <option value="2" {{ $jnsPelayanan == 2 ? 'selected' : '' }}>Rawat Jalan</option>
                     <option value="3" {{ $jnsPelayanan == 3 ? 'selected' : '' }}>IGD</option>
                 </select>
             </div>
-            <div>
-                <label class="block mb-1 text-sm font-medium">Jaminan</label>
-                <select name="jaminan" class="w-full border rounded p-2">
-                    <option value="umum" {{ $jaminan == 'umum' ? 'selected' : '' }}>Umum</option>
-                    <option value="bpjs" {{ $jaminan == 'bpjs' ? 'selected' : '' }}>BPJS</option>
-                    <option value="lainnya" {{ $jaminan == 'lainnya' ? 'selected' : '' }}>Lainnya</option>
-                </select>
-            </div>
-            <div>
+
+
+
+            {{-- Status Bayar --}}
+            <div id="statusBayarWrapper">
                 <label class="block mb-1 text-sm font-medium">Status Bayar</label>
-                <select name="status_bayar" class="w-full border rounded p-2">
+                <select name="status_bayar" id="statusBayar" class="w-full border rounded p-2">
                     <option value="Sudah Bayar" {{ $status_bayar == 'Sudah Bayar' ? 'selected' : '' }}>Sudah Bayar</option>
                     <option value="Belum Bayar" {{ $status_bayar == 'Belum Bayar' ? 'selected' : '' }}>Belum Bayar</option>
                 </select>
             </div>
 
-            {{-- Submit button full width di mobile, normal di desktop --}}
+            {{-- Tombol Submit --}}
             <div class="col-span-1 md:col-span-5">
                 <button type="submit"
                     class="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
@@ -49,7 +56,6 @@
 
         @if ($filepath)
             <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-2 sm:space-y-0 mb-6">
-                {{-- Tombol Export Excel --}}
                 <form action="{{ route('export.tindakan') }}" method="POST" class="flex-1">
                     @csrf
                     <input type="hidden" name="filepath" value="{{ $filepath }}">
@@ -59,7 +65,6 @@
                     </button>
                 </form>
 
-                {{-- Tombol Export CSV --}}
                 <form action="{{ route('export.tindakan.csv') }}" method="POST" class="flex-1">
                     @csrf
                     <input type="hidden" name="filepath" value="{{ $filepath }}">
@@ -70,10 +75,33 @@
                 </form>
             </div>
 
-            {{-- Info total data --}}
             <div class="p-3 bg-gray-50 border rounded text-gray-700">
                 <span class="font-semibold">Data Siap di export!</span>
             </div>
         @endif
     </div>
+
+    {{-- Script untuk sembunyikan field --}}
+    <script>
+        function toggleFields() {
+            const jaminan = document.getElementById('jaminan').value;
+            const jenisPelayanan = document.getElementById('jenisPelayananWrapper');
+            const statusBayar = document.getElementById('statusBayarWrapper');
+
+            if (jaminan === 'umum') {
+                jenisPelayanan.style.display = 'none';
+                statusBayar.style.display = 'block';
+            } else if (jaminan === 'bpjs') {
+                jenisPelayanan.style.display = 'block';
+                statusBayar.style.display = 'none';
+            } else {
+                jenisPelayanan.style.display = 'block';
+                statusBayar.style.display = 'block';
+            }
+        }
+
+        document.getElementById('jaminan').addEventListener('change', toggleFields);
+        // Panggil sekali di awal biar tampilannya sesuai dengan nilai default
+        toggleFields();
+    </script>
 @endsection

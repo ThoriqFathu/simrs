@@ -4,7 +4,7 @@
     <div class="max-w-7xl mx-auto p-6">
         <h2 class="text-2xl font-bold mb-6 text-gray-800 border-b pb-2">📊 Laporan Kasir</h2>
 
-        <form method="get" action="{{ route('laporan.kasir') }}"
+        <form method="get" action="{{ route('laporan.kasir.index') }}"
             class="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-6 bg-white p-4 rounded-lg shadow">
             <div>
                 <label for="tgl1" class="block text-sm font-medium text-gray-700">Tanggal Mulai</label>
