@@ -20,7 +20,8 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         // Jalankan command KirimDataSirs setiap menit
-        $schedule->command('sirs:update_tt')->dailyAt('08:00');
+        // $schedule->command('sirs:update_tt')->dailyAt('08:00');
+        $schedule->command('sirs:update_tt')->everyMinute();
     }
 
     /**

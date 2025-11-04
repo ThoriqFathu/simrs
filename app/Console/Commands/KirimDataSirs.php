@@ -28,16 +28,24 @@ class KirimDataSirs extends Command
      */
     public function handle()
     {
-        $bangsal = Bangsal::with('kamar')
-            ->where('status', '1')
-            ->whereNotIn('kd_bangsal', ['AP', 'B0031', 'FAR02', 'GD', 'ICU.U', 'LAB', 'OK', 'IGD'])
+
+
+        $bangsal = Bangsal::with(['kamar' => function($q) {
+        $q->where('statusdata', '1'); // filter kamar
+    }])
+    ->where('status', '1') // filter bangsal
+    ->whereNotIn('kd_bangsal', ['AP', 'B0031', 'FAR02', 'GD', 'ICU.U', 'LAB', 'OK', 'IGD'])
             ->where('nm_bangsal', 'not like', '%(G)%')
-            ->get();
+    ->whereHas('kamar', function($q) {
+        $q->where('statusdata', '1'); // pastikan bangsal punya kamar aktif
+    })
+    ->get();
+
 
         $hasil = $bangsal->map(function ($item) {
             $total = $item->kamar->count();
             $kosong = $item->kamar->where('status', 'KOSONG')->count();
-            $isi = $total - $kosong;
+            $isi = $item->kamar->where('status', 'ISI')->count();
 
             return [
                 'kd_bangsal' => $item->kd_bangsal,
@@ -77,8 +85,8 @@ class KirimDataSirs extends Command
                     'id_tt' =>$dataSiranap['id_tt'],
                     'bangsal' => $item['nm_bangsal'],
                     'match_api' => $dataSiranap['ruang'],
-                    'isi' => $item['kamar_kosong'],
-                    'kosong' => $item['kamar_isi'],
+                    'isi' => $item['kamar_isi'],
+                    'kosong' => $item['kamar_kosong'],
                 ];
             }
         }
@@ -87,11 +95,11 @@ class KirimDataSirs extends Command
 
         foreach ($matches as $item) {
             $payload = [
-                "id_tt" => $item['id_tt'], // bisa disesuaikan, kalau ada id dari API bisa pakai itu
+                "id_tt" => $item['id_tt'], 
                 "ruang" => $item['bangsal'],
                 "jumlah_ruang" => "0",
-                "jumlah" => (string) $item['kosong'], // total kamar kosong
-                "terpakai" => (string) $item['isi'], // kamar terpakai
+                "jumlah" => ((int) $item['kosong']) + ((int) $item['isi']),
+                "terpakai" => (string) $item['isi'], 
                 "terpakai_suspek" => "0",
                 "terpakai_konfirmasi" => "0",
                 "antrian" => "0",
