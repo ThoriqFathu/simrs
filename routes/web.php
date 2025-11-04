@@ -5,9 +5,12 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DatetimePasienController;
 use App\Http\Controllers\DetilTindakanController;
 use App\Http\Controllers\KlaimController;
+use App\Http\Controllers\LaporanKasirController;
+use App\Http\Controllers\QuerySqlController;
 use App\Http\Controllers\ReferensiMjknController;
 use App\Http\Controllers\SinkronSepController;
 use App\Http\Controllers\SirsController;
+use App\Http\Controllers\TindakanExportController;
 use Illuminate\Support\Facades\Route;
 
 // Route::get('/', function () {
@@ -56,6 +59,15 @@ Route::prefix('jaspel')->name('jaspel.')->middleware('auth.session')->group(func
     });
 
 });
+Route::prefix('laporan')->name('laporan.')->middleware('auth.session')->group(function () {
+
+    Route::prefix('kasir')->name('kasir.')->group(function () {
+        Route::get('/', [LaporanKasirController::class, 'index'])->name('index');
+        Route::get('/export', [LaporanKasirController::class, 'export'])->name('export');
+    });
+
+});
+
 Route::prefix('sirs')->name('sirs.')->middleware('auth.session')->group(function () {
 
     Route::prefix('kamar')->name('kamar.')->group(function () {
@@ -65,6 +77,11 @@ Route::prefix('sirs')->name('sirs.')->middleware('auth.session')->group(function
 });
 Route::get('/detil-tindakan/data', [DetilTindakanController::class, 'loadData'])
     ->name('detil-tindakan.data');
+Route::post('/export-tindakan', [TindakanExportController::class, 'export'])->name('export.tindakan');
+Route::post('/export-tindakan-csv', [TindakanExportController::class, 'exportCsv'])->name('export.tindakan.csv');
+
+Route::get('/sql', [QuerySqlController::class, 'index'])->name('sql.index');
+Route::post('/sql/export', [QuerySqlController::class, 'export'])->name('sql.export');
 
 Route::post('/logout', function () {
     session()->forget('is_logged_in');
@@ -73,4 +90,3 @@ Route::post('/logout', function () {
 
 // Route::get('/',[AutoBillingController::class, 'index'])->name('autobilling.index');
 // Route::post('/',[AutoBillingController::class, 'store_all'])->name('nota_jalan.store_all');
-
