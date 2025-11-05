@@ -48,6 +48,8 @@
                         <th class="border-b px-4 py-2 text-left text-gray-700 font-semibold">Kode Penyakit</th>
                         <th class="border-b px-4 py-2 text-left text-gray-700 font-semibold">Nama Penyakit</th>
                         <th class="border-b px-4 py-2 text-right text-gray-700 font-semibold">Total Pasien</th>
+                        <th class="border-b px-4 py-2 text-right text-gray-700 font-semibold">Aksi</th>
+
                     </tr>
                 </thead>
                 <tbody>
@@ -56,7 +58,14 @@
                             <td class="border-b px-4 py-2">{{ $row->kd_penyakit }}</td>
                             <td class="border-b px-4 py-2">{{ $row->nm_penyakit }}</td>
                             <td class="border-b px-4 py-2 text-right font-semibold">{{ $row->total_pasien }}</td>
+                            <td class="border-b px-4 py-2 text-right">
+                                <a href="{{ route('penyakit.detail', ['kode' => $row->kd_penyakit, 'tgl_awal' => $tgl_awal, 'tgl_akhir' => $tgl_akhir, 'umur_min' => $umur_min, 'umur_max' => $umur_max]) }}"
+                                    class="text-blue-600 hover:text-blue-800 font-medium">
+                                    Lihat Detail →
+                                </a>
+                            </td>
                         </tr>
+
                     @empty
                         <tr>
                             <td colspan="3" class="text-center py-4 text-gray-500">Tidak ada data ditemukan.</td>

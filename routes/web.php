@@ -89,5 +89,6 @@ Route::post('/logout', function () {
     return redirect()->route('login');
 })->name('logout');
 Route::get('/laporan/penyakit', [PenyakitReportController::class, 'index'])->name('penyakit.index');
+Route::get('/laporan/penyakit/{kode}/detail', [PenyakitReportController::class, 'detail'])->name('penyakit.detail');
 // Route::get('/',[AutoBillingController::class, 'index'])->name('autobilling.index');
 // Route::post('/',[AutoBillingController::class, 'store_all'])->name('nota_jalan.store_all');
