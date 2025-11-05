@@ -6,6 +6,7 @@ use App\Http\Controllers\DatetimePasienController;
 use App\Http\Controllers\DetilTindakanController;
 use App\Http\Controllers\KlaimController;
 use App\Http\Controllers\LaporanKasirController;
+use App\Http\Controllers\PenyakitReportController;
 use App\Http\Controllers\QuerySqlController;
 use App\Http\Controllers\ReferensiMjknController;
 use App\Http\Controllers\SinkronSepController;
@@ -87,6 +88,6 @@ Route::post('/logout', function () {
     session()->forget('is_logged_in');
     return redirect()->route('login');
 })->name('logout');
-
+Route::get('/laporan/penyakit', [PenyakitReportController::class, 'index'])->name('penyakit.index');
 // Route::get('/',[AutoBillingController::class, 'index'])->name('autobilling.index');
 // Route::post('/',[AutoBillingController::class, 'store_all'])->name('nota_jalan.store_all');
