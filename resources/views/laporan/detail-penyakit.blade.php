@@ -16,26 +16,25 @@
             <table class="min-w-full border-collapse">
                 <thead class="bg-blue-50">
                     <tr>
-                        <th class="border-b px-4 py-2 text-left font-semibold text-gray-700">No. Rawat</th>
-                        <th class="border-b px-4 py-2 text-left font-semibold text-gray-700">Tgl Registrasi</th>
-                        <th class="border-b px-4 py-2 text-left font-semibold text-gray-700">Nama Pasien</th>
-                        <th class="border-b px-4 py-2 text-left font-semibold text-gray-700">Umur</th>
+                        <th class="border-b px-4 py-2 text-left">No. Rawat</th>
+                        <th class="border-b px-4 py-2 text-left">Tgl Registrasi</th>
+                        <th class="border-b px-4 py-2 text-left">Nama Pasien</th>
+                        <th class="border-b px-4 py-2 text-left">Umur</th>
+                        <th class="border-b px-4 py-2 text-left">Status Lanjut</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse($pasien as $p)
+                    @foreach ($pasien as $p)
                         <tr class="hover:bg-gray-50">
                             <td class="border-b px-4 py-2">{{ $p->no_rawat }}</td>
                             <td class="border-b px-4 py-2">{{ $p->tgl_registrasi }}</td>
                             <td class="border-b px-4 py-2">{{ $p->nm_pasien }}</td>
                             <td class="border-b px-4 py-2">{{ $p->umurdaftar }} {{ $p->sttsumur }}</td>
+                            <td class="border-b px-4 py-2">{{ $p->status_lanjut }}</td>
                         </tr>
-                    @empty
-                        <tr>
-                            <td colspan="3" class="text-center py-4 text-gray-500">Tidak ada data pasien ditemukan.</td>
-                        </tr>
-                    @endforelse
+                    @endforeach
                 </tbody>
+
             </table>
         </div>
 
