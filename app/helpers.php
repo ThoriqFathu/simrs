@@ -1262,7 +1262,6 @@ if (! function_exists('get_data_detil_tindakan')) {
                 foreach ($toDelete as $f) {
                     @unlink($f);
                 }
-
             }
         };
 
